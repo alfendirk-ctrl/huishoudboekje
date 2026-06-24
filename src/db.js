@@ -3,7 +3,13 @@ import { createClient } from '@supabase/supabase-js'
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL  || ''
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON || ''
 
-export const supabase = SUPABASE_URL ? createClient(SUPABASE_URL, SUPABASE_ANON) : null
+let supabase = null
+try {
+  if (SUPABASE_URL && SUPABASE_ANON) supabase = createClient(SUPABASE_URL, SUPABASE_ANON)
+} catch (e) {
+  console.warn('Supabase init failed, using localStorage', e)
+}
+export { supabase }
 
 // ── Storage helpers ──────────────────────────────────────────────────
 // Upserts a single row with key + value into the `storage` table.
