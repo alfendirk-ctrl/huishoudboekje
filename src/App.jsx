@@ -251,6 +251,7 @@ var CSS_STR = [
   ".tab-btn:hover{color:var(--text2);}",
   ".tab-btn.active{color:var(--text);border-bottom-color:var(--text);}",
   ".row-hover:hover{background:var(--surface2);border-radius:6px;}",
+  ".row-hover:active{background:var(--surface2);border-radius:6px;}",
   "input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}",
   ".pill{display:inline-flex;align-items:center;padding:.15rem .5rem;border-radius:999px;font-size:.7rem;font-weight:600;}",
   ".badge{display:inline-flex;align-items:center;padding:.1rem .45rem;border-radius:4px;font-size:.68rem;font-weight:600;}",
@@ -258,18 +259,18 @@ var CSS_STR = [
   ".two-col{display:grid;grid-template-columns:1fr 1fr;gap:1rem;}",
   ".check-row{display:grid;grid-template-columns:1fr 80px 88px 72px;gap:0 .4rem;align-items:center;}",
   ".check-head{display:grid;grid-template-columns:1fr 80px 88px 72px;gap:0 .4rem;}",
-  ".post-row{display:grid;grid-template-columns:1fr 88px 24px;gap:.4rem;align-items:center;}",
-  ".spaar-row{display:grid;grid-template-columns:1fr 80px 88px 24px;gap:.4rem;align-items:center;}",
+  ".post-row{display:grid;grid-template-columns:1fr 88px 40px;gap:.5rem;align-items:center;}",
+  ".spaar-row{display:grid;grid-template-columns:1fr 80px 88px 40px;gap:.5rem;align-items:center;}",
   "@media(max-width:640px){",
   "  .kpi-grid{grid-template-columns:repeat(2,1fr);}",
-  "  .kpi-3,.kpi-4,.kpi-5{display:none;}",
+  "  .kpi-5{grid-column:1/-1;}",
   "  .two-col{grid-template-columns:1fr;}",
   "  .check-row{grid-template-columns:1fr 76px 82px;}",
   "  .check-head{grid-template-columns:1fr 76px 82px;}",
   "  .diff-col{display:none;}",
-  "  .post-row{grid-template-columns:1fr 80px 24px;}",
-  "  .spaar-row{grid-template-columns:1fr 64px 80px 24px;}",
-  "  .tab-btn{padding:.5rem .55rem;font-size:.75rem;}",
+  "  .post-row{grid-template-columns:1fr 80px 40px;}",
+  "  .spaar-row{grid-template-columns:1fr 64px 80px 40px;}",
+  "  .tab-btn{padding:.55rem .7rem;font-size:.78rem;}",
   "  .header-inner{flex-direction:column;align-items:flex-start;gap:.5rem;}",
   "  .card-pad{padding:.9rem;}",
   "}",
@@ -679,7 +680,7 @@ export default function App() {
   var primaryBtn = { background:"var(--dirk)", border:"none", borderRadius:"var(--radius-sm)", padding:".5rem 1.25rem", fontSize:".84rem", color:"white", cursor:"pointer", fontWeight:600, fontFamily:"inherit" };
   var ghostBtn   = { border:"1px solid var(--border2)", background:"var(--surface)", borderRadius:"var(--radius-sm)", padding:".5rem 1rem", fontSize:".82rem", cursor:"pointer", color:"var(--text2)", fontFamily:"inherit" };
   var addBtn     = { marginTop:".5rem", border:"1px dashed var(--border2)", background:"transparent", borderRadius:"var(--radius-sm)", padding:".35rem .75rem", fontSize:".78rem", color:"var(--text3)", cursor:"pointer", width:"100%", fontFamily:"inherit" };
-  var delBtn     = { background:"none", border:"none", color:"var(--text3)", cursor:"pointer", fontSize:".9rem", borderRadius:4, padding:"2px 5px", fontFamily:"inherit" };
+  var delBtn     = { background:"none", border:"none", color:"var(--text3)", cursor:"pointer", fontSize:".9rem", borderRadius:6, padding:"6px 8px", minWidth:36, minHeight:36, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"inherit", WebkitTapHighlightColor:"transparent" };
 
   return (
     <>
@@ -736,8 +737,8 @@ export default function App() {
                 <span style={{ fontFamily:"Fraunces,serif", fontStyle:"italic", fontWeight:300, fontSize:".95rem", color:"var(--text2)" }}>Dirk &amp; Shelley</span>
               </div>
               <div style={{ display:"flex", alignItems:"center", gap:".75rem" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:".35rem", fontSize:".72rem", color:"var(--text3)" }}>
-                  <div style={{ width:6, height:6, borderRadius:"50%", background: syncing ? "var(--orange)" : "var(--green)" }}/>
+                <div style={{ display:"flex", alignItems:"center", gap:".4rem", fontSize:".75rem", color:"var(--text3)" }}>
+                  <div style={{ width:8, height:8, borderRadius:"50%", background: syncing ? "var(--orange)" : "var(--green)", flexShrink:0 }}/>
                   {syncing ? "Opslaan..." : lastSync ? "Gesynchroniseerd" : "Gedeeld"}
                 </div>
                 <span className="badge" style={{ color:DIRK.color,    background:DIRK.light,    border:"1px solid "+DIRK.border    }}>D {Math.round(ratioD*100)}%</span>
@@ -750,7 +751,7 @@ export default function App() {
                 var isClosed = isMonthClosed(year, i) && i !== now.getMonth();
                 return (
                   <button key={i} onClick={function(){ setMonth(i); }}
-                    style={{ padding:".25rem .6rem", borderRadius:6, border:"1px solid", borderColor: month===i ? "var(--dirk)" : (isClosed ? "#bbf7d0" : "var(--border)"), background: month===i ? "var(--dirk-l)" : (isClosed ? "var(--green-l)" : "transparent"), color: month===i ? "var(--dirk)" : (isClosed ? "#16a34a" : "var(--text3)"), cursor:"pointer", fontSize:".72rem", fontWeight: month===i ? 600 : (isClosed ? 500 : 400), fontFamily:"inherit" }}>
+                    style={{ padding:".35rem .65rem", minHeight:32, borderRadius:6, border:"1px solid", borderColor: month===i ? "var(--dirk)" : (isClosed ? "#bbf7d0" : "var(--border)"), background: month===i ? "var(--dirk-l)" : (isClosed ? "var(--green-l)" : "transparent"), color: month===i ? "var(--dirk)" : (isClosed ? "#16a34a" : "var(--text3)"), cursor:"pointer", fontSize:".72rem", fontWeight: month===i ? 600 : (isClosed ? 500 : 400), fontFamily:"inherit", WebkitTapHighlightColor:"transparent" }}>
                     {m}
                   </button>
                 );
@@ -826,11 +827,11 @@ export default function App() {
                     {gPosts.map(function(post) {
                       return (
                         <div key={post.id} className="row-hover" className="post-row row-hover" style={{ padding:".3rem .25rem", marginBottom:".15rem" }}>
-                          <input value={post.label} onChange={function(e){ updatePost(post.id,"label",e.target.value); }} style={Object.assign({},inpFull,{border:"none",background:"transparent",fontSize:".85rem"})}/>
+                          <input value={post.label} onChange={function(e){ updatePost(post.id,"label",e.target.value); }} style={Object.assign({},inpFull,{border:"none",borderBottom:"1px solid var(--border2)",borderRadius:0,background:"transparent",fontSize:".85rem"})}/>
                           <NumInput value={post.planned||""} onChange={function(v){ updatePost(post.id,"planned",v); }} placeholder="0" accentColor={owner ? owner.color : undefined}/>
                           <button style={delBtn} onClick={function(){ deletePost(post.id); }}
-                            onMouseEnter={function(e){ e.target.style.color="var(--red)"; }}
-                            onMouseLeave={function(e){ e.target.style.color="var(--text3)"; }}>x</button>
+                            onMouseEnter={function(e){ e.target.style.color="var(--red)"; e.target.style.background="var(--red-l)"; }}
+                            onMouseLeave={function(e){ e.target.style.color="var(--text3)"; e.target.style.background="none"; }}>✕</button>
                         </div>
                       );
                     })}
@@ -876,8 +877,8 @@ export default function App() {
                       </select>
                       <NumInput value={p.planned||""} onChange={function(v){ updateSpaar(p.id,"planned",v); }} placeholder="0" accentColor={u ? u.color : undefined}/>
                       <button style={delBtn} onClick={function(){ saveSpaar(spaarMonth.filter(function(x){ return x.id!==p.id; })); }}
-                        onMouseEnter={function(e){ e.target.style.color="var(--red)"; }}
-                        onMouseLeave={function(e){ e.target.style.color="var(--text3)"; }}>x</button>
+                        onMouseEnter={function(e){ e.target.style.color="var(--red)"; e.target.style.background="var(--red-l)"; }}
+                        onMouseLeave={function(e){ e.target.style.color="var(--text3)"; e.target.style.background="none"; }}>✕</button>
                     </div>
                   );
                 })}
