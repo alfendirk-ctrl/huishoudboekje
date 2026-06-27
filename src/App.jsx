@@ -396,6 +396,8 @@ export default function App() {
   var [data, setDataRaw]      = useState(DEFAULT_DATA);
   var [loaded, setLoaded]     = useState(false);
   var [memory, setMemory]     = useState({});  // learned desc->postId mappings
+  var [reviewPopup, setReviewPopup] = useState(null);
+  var reviewShownRef = useRef(false);
 
   useEffect(function() {
     Promise.all([loadShared(DEFAULT_DATA), loadMemory()]).then(function(results) {
@@ -421,8 +423,34 @@ export default function App() {
     return function(){ clearInterval(iv); document.removeEventListener('visibilitychange', pull); window.removeEventListener('focus', pull); };
   }, [loaded]);
 
+  useEffect(function() {
+    if (!loaded || reviewShownRef.current) return;
+    var prevM = month === 0 ? 11 : month - 1;
+    var prevY = month === 0 ? year - 1 : year;
+    var prevMD = data.months[prevY + "-" + prevM];
+    if (!prevMD) return;
+    var prevPosts = prevMD.posts || [];
+    var prevActuals = prevMD.actuals || {};
+    var diffs = prevPosts.filter(function(p) {
+      var a = prevActuals[p.id];
+      return (a !== null && a !== undefined) && Math.abs(a - (p.planned || 0)) >= 10;
+    }).map(function(p) {
+      var a = prevActuals[p.id];
+      return { id:p.id, label:p.label, planned:p.planned||0, actual:a, diff:a-(p.planned||0) };
+    }).sort(function(a,b){ return Math.abs(b.diff)-Math.abs(a.diff); });
+    if (diffs.length > 0) {
+      reviewShownRef.current = true;
+      setReviewPopup({ month: MONTHS[prevM], year: prevY, diffs: diffs });
+    }
+  }, [loaded]);
+
   function setData(fn) { setDataRaw(function(d){ return typeof fn === "function" ? fn(d) : fn; }); }
   function notify(msg) { setNotif(msg); setTimeout(function(){ setNotif(""); }, 2500); }
+  function isMonthClosed(y, m) {
+    var isPast = y < now.getFullYear() || (y === now.getFullYear() && m < now.getMonth());
+    var md = data.months[y + "-" + m];
+    return isPast || !!(md && md.closed);
+  }
 
   var mk = year + "-" + month;
 
@@ -446,6 +474,10 @@ export default function App() {
       m[mk] = md;
       return Object.assign({}, d, {months:m});
     });
+  }
+  function closeCurrentMonth() {
+    saveMonthData(Object.assign({}, monthData, { closed: true }));
+    notify("Maand afgesloten");
   }
   function setPosts(fn) {
     saveMonthData(Object.assign({}, monthData, { posts: typeof fn === "function" ? fn(posts) : fn }));
@@ -660,6 +692,40 @@ export default function App() {
           </div>
         )}
 
+        {reviewPopup && (
+          <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.45)", zIndex:9998, display:"flex", alignItems:"center", justifyContent:"center", padding:"1rem" }}>
+            <div style={{ background:"var(--surface)", borderRadius:"var(--radius)", boxShadow:"var(--shadow-md)", maxWidth:480, width:"100%", maxHeight:"80vh", overflowY:"auto", padding:"1.5rem" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"1rem" }}>
+                <div>
+                  <h2 style={{ fontFamily:"Fraunces,serif", fontSize:"1.1rem", fontWeight:600, marginBottom:".3rem" }}>Terugblik {reviewPopup.month}</h2>
+                  <p style={{ fontSize:".8rem", color:"var(--text2)", lineHeight:1.4 }}>Deze posten weken vorige maand af van het plan. Wil je het budget bijstellen voor deze maand?</p>
+                </div>
+                <button onClick={function(){ setReviewPopup(null); }} style={{ background:"none", border:"none", cursor:"pointer", fontSize:"1rem", color:"var(--text3)", padding:"0 0 0 .75rem", flexShrink:0 }}>✕</button>
+              </div>
+              <div style={{ border:"1px solid var(--border)", borderRadius:"var(--radius-sm)", overflow:"hidden", marginBottom:"1.25rem" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 70px 70px 70px", background:"var(--surface2)", padding:".4rem .75rem", borderBottom:"1px solid var(--border)" }}>
+                  {["Post","Gepland","Werkelijk","Verschil"].map(function(h,i){ return <span key={h} style={{ fontSize:".62rem", fontWeight:600, letterSpacing:".08em", color:"var(--text3)", textAlign:i===0?"left":"right" }}>{h.toUpperCase()}</span>; })}
+                </div>
+                {reviewPopup.diffs.map(function(d) {
+                  var over = d.diff > 0;
+                  return (
+                    <div key={d.id} style={{ display:"grid", gridTemplateColumns:"1fr 70px 70px 70px", padding:".5rem .75rem", borderBottom:"1px solid var(--border)", alignItems:"center" }}>
+                      <span style={{ fontSize:".83rem" }}>{d.label}</span>
+                      <span style={{ fontSize:".79rem", color:"var(--text2)", textAlign:"right" }}>{fmt(d.planned)}</span>
+                      <span style={{ fontSize:".79rem", textAlign:"right" }}>{fmt(d.actual)}</span>
+                      <span style={{ fontSize:".79rem", fontWeight:600, textAlign:"right", color: over ? "var(--red)" : "var(--green)" }}>{over ? "+" : ""}{fmt(d.diff)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ display:"flex", gap:".6rem" }}>
+                <button style={ghostBtn} onClick={function(){ setReviewPopup(null); }}>Nu niet</button>
+                <button style={Object.assign({},primaryBtn,{flex:1})} onClick={function(){ setReviewPopup(null); setTab("plan"); }}>Maandplan aanpassen</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div style={{ background:"var(--surface)", borderBottom:"1px solid var(--border)", position:"sticky", top:0, zIndex:100 }}>
           <div style={{ maxWidth:960, margin:"0 auto", padding:"0 1.5rem" }}>
@@ -681,9 +747,10 @@ export default function App() {
 
             <div style={{ display:"flex", gap:3, paddingBottom:".75rem", overflowX:"auto" }}>
               {MONTHS_S.map(function(m,i) {
+                var isClosed = isMonthClosed(year, i) && i !== now.getMonth();
                 return (
                   <button key={i} onClick={function(){ setMonth(i); }}
-                    style={{ padding:".25rem .6rem", borderRadius:6, border:"1px solid", borderColor: month===i ? "var(--dirk)" : "var(--border)", background: month===i ? "var(--dirk-l)" : "transparent", color: month===i ? "var(--dirk)" : "var(--text3)", cursor:"pointer", fontSize:".72rem", fontWeight: month===i ? 600 : 400, fontFamily:"inherit" }}>
+                    style={{ padding:".25rem .6rem", borderRadius:6, border:"1px solid", borderColor: month===i ? "var(--dirk)" : (isClosed ? "#bbf7d0" : "var(--border)"), background: month===i ? "var(--dirk-l)" : (isClosed ? "var(--green-l)" : "transparent"), color: month===i ? "var(--dirk)" : (isClosed ? "#16a34a" : "var(--text3)"), cursor:"pointer", fontSize:".72rem", fontWeight: month===i ? 600 : (isClosed ? 500 : 400), fontFamily:"inherit" }}>
                     {m}
                   </button>
                 );
@@ -1155,6 +1222,19 @@ export default function App() {
                   );
                 })()}
               </Card>
+
+              {monthData.closed ? (
+                <div style={{ textAlign:"center", marginTop:"1.25rem", padding:".75rem 1rem", background:"var(--green-l)", border:"1px solid #bbf7d0", borderRadius:"var(--radius-sm)" }}>
+                  <span style={{ fontSize:".84rem", color:"#16a34a", fontWeight:600 }}>Maand afgesloten</span>
+                </div>
+              ) : (
+                <div style={{ textAlign:"center", marginTop:"1.25rem" }}>
+                  <button onClick={closeCurrentMonth} style={{ background:"#16a34a", border:"none", borderRadius:"var(--radius-sm)", padding:".55rem 1.5rem", fontSize:".84rem", color:"white", cursor:"pointer", fontWeight:600, fontFamily:"inherit" }}>
+                    Maand afsluiten
+                  </button>
+                  <div style={{ fontSize:".72rem", color:"var(--text3)", marginTop:".4rem" }}>Volgende maand zie je een terugblik op de afwijkingen</div>
+                </div>
+              )}
             </div>
           )}
 
