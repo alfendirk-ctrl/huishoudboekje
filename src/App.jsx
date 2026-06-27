@@ -414,8 +414,11 @@ export default function App() {
 
   useEffect(function() {
     if (!loaded) return;
-    var iv = setInterval(async function() { var r = await loadShared(null); if (r) setDataRaw(r); }, 30000);
-    return function(){ clearInterval(iv); };
+    async function pull() { var r = await loadShared(null); if (r) setDataRaw(r); }
+    var iv = setInterval(pull, 30000);
+    document.addEventListener('visibilitychange', pull);
+    window.addEventListener('focus', pull);
+    return function(){ clearInterval(iv); document.removeEventListener('visibilitychange', pull); window.removeEventListener('focus', pull); };
   }, [loaded]);
 
   function setData(fn) { setDataRaw(function(d){ return typeof fn === "function" ? fn(d) : fn; }); }
