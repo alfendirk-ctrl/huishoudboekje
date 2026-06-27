@@ -388,7 +388,8 @@ function BarChart({ data }) {
 // Main app
 export default function App() {
   var now = new Date();
-  var [month, setMonth]   = useState(now.getMonth());
+  var effectiveMonth = now.getDate() >= 25 ? Math.min(now.getMonth() + 1, 11) : now.getMonth();
+  var [month, setMonth]   = useState(effectiveMonth);
   var [year]              = useState(now.getFullYear());
   var [tab,   setTab]     = useState("plan");
   var [notif, setNotif]   = useState("");
@@ -448,9 +449,10 @@ export default function App() {
   function setData(fn) { setDataRaw(function(d){ return typeof fn === "function" ? fn(d) : fn; }); }
   function notify(msg) { setNotif(msg); setTimeout(function(){ setNotif(""); }, 2500); }
   function isMonthClosed(y, m) {
-    var isPast = y < now.getFullYear() || (y === now.getFullYear() && m < now.getMonth());
+    var idx = y * 12 + m;
+    var effectiveIdx = now.getFullYear() * 12 + effectiveMonth;
     var md = data.months[y + "-" + m];
-    return isPast || !!(md && md.closed);
+    return idx < effectiveIdx || !!(md && md.closed);
   }
 
   var mk = year + "-" + month;
@@ -748,7 +750,7 @@ export default function App() {
 
             <div style={{ display:"flex", gap:3, paddingBottom:".75rem", overflowX:"auto" }}>
               {MONTHS_S.map(function(m,i) {
-                var isClosed = isMonthClosed(year, i) && i !== now.getMonth();
+                var isClosed = isMonthClosed(year, i) && i !== effectiveMonth;
                 return (
                   <button key={i} onClick={function(){ setMonth(i); }}
                     style={{ padding:".35rem .65rem", minHeight:32, borderRadius:6, border:"1px solid", borderColor: month===i ? "var(--dirk)" : (isClosed ? "#bbf7d0" : "var(--border)"), background: month===i ? "var(--dirk-l)" : (isClosed ? "var(--green-l)" : "transparent"), color: month===i ? "var(--dirk)" : (isClosed ? "#16a34a" : "var(--text3)"), cursor:"pointer", fontSize:".72rem", fontWeight: month===i ? 600 : (isClosed ? 500 : 400), fontFamily:"inherit", WebkitTapHighlightColor:"transparent" }}>
