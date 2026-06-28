@@ -419,11 +419,19 @@ export default function App() {
   useEffect(function() {
     if (!loaded) return;
     async function pull() { var r = await loadShared(null); if (r) setDataRaw(r); }
-    var iv = setInterval(pull, 30000);
+    var iv = setInterval(pull, 10000);
     document.addEventListener('visibilitychange', pull);
     window.addEventListener('focus', pull);
     return function(){ clearInterval(iv); document.removeEventListener('visibilitychange', pull); window.removeEventListener('focus', pull); };
   }, [loaded]);
+
+  async function manualSync() {
+    setSyncing(true);
+    var r = await loadShared(null);
+    if (r) setDataRaw(r);
+    setSyncing(false);
+    setLastSync(new Date());
+  }
 
   useEffect(function() {
     if (!loaded || reviewShownRef.current) return;
@@ -739,10 +747,10 @@ export default function App() {
                 <span style={{ fontFamily:"Fraunces,serif", fontStyle:"italic", fontWeight:300, fontSize:".95rem", color:"var(--text2)" }}>Dirk &amp; Shelley</span>
               </div>
               <div style={{ display:"flex", alignItems:"center", gap:".75rem" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:".4rem", fontSize:".75rem", color:"var(--text3)" }}>
+                <button onClick={manualSync} title="Nu synchroniseren" style={{ display:"flex", alignItems:"center", gap:".4rem", fontSize:".75rem", color:"var(--text3)", background:"none", border:"none", cursor:"pointer", padding:"2px 4px", borderRadius:6, fontFamily:"inherit", WebkitTapHighlightColor:"transparent" }}>
                   <div style={{ width:8, height:8, borderRadius:"50%", background: syncing ? "var(--orange)" : "var(--green)", flexShrink:0 }}/>
                   {syncing ? "Opslaan..." : lastSync ? "Gesynchroniseerd" : "Gedeeld"}
-                </div>
+                </button>
                 <span className="badge" style={{ color:DIRK.color,    background:DIRK.light,    border:"1px solid "+DIRK.border    }}>D {Math.round(ratioD*100)}%</span>
                 <span className="badge" style={{ color:SHELLEY.color, background:SHELLEY.light, border:"1px solid "+SHELLEY.border }}>S {Math.round(ratioS*100)}%</span>
               </div>
