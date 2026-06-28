@@ -198,7 +198,9 @@ function aiCategorize(transactions, posts) {
 // Decimal input for check fields (supports comma + dot)
 function DecInput({ value, onCommit, placeholder, style }) {
   var [local, setLocal] = useState(value !== null && value !== undefined ? String(value) : "");
+  var inputRef = useRef(null);
   useEffect(function(){
+    if (inputRef.current && inputRef.current === document.activeElement) return;
     if (value !== null && value !== undefined && value !== "") {
       var n = parseFloat(value);
       setLocal(!isNaN(n) && n % 1 !== 0 ? n.toFixed(2).replace(".",",") : String(value));
@@ -206,6 +208,7 @@ function DecInput({ value, onCommit, placeholder, style }) {
   }, [value]);
   return (
     <input
+      ref={inputRef}
       type="text" inputMode="decimal"
       value={local}
       onChange={function(e){ setLocal(e.target.value.replace(/[^0-9.,]/g,"")); }}
@@ -307,8 +310,9 @@ function Bar({ value, max, color, height }) {
 }
 function NumInput({ value, onChange, placeholder, accentColor }) {
   var [local, setLocal] = useState(value !== null && value !== undefined ? String(value) : "");
-  // Sync if parent value changes (e.g. from import)
+  var inputRef = useRef(null);
   useEffect(function(){
+    if (inputRef.current && inputRef.current === document.activeElement) return;
     if (value !== null && value !== undefined && value !== "") {
       var n = parseFloat(value);
       setLocal(!isNaN(n) && n % 1 !== 0 ? n.toFixed(2).replace(".",",") : String(value));
@@ -318,6 +322,7 @@ function NumInput({ value, onChange, placeholder, accentColor }) {
     <div style={{ position:"relative", display:"flex", alignItems:"center" }}>
       <span style={{ position:"absolute", left:8, color:"var(--text3)", fontSize:".82rem", pointerEvents:"none" }}>€</span>
       <input
+        ref={inputRef}
         type="text" inputMode="decimal"
         value={local}
         onChange={function(e){
@@ -331,7 +336,6 @@ function NumInput({ value, onChange, placeholder, accentColor }) {
           var n = parseFloat(v);
           if (!isNaN(n)) {
             onChange(n);
-            // Show with comma for NL formatting
             setLocal(n % 1 === 0 ? String(n) : n.toFixed(2).replace(".",","));
           }
         }}
@@ -400,6 +404,8 @@ export default function App() {
   var [memory, setMemory]     = useState({});  // learned desc->postId mappings
   var [reviewPopup, setReviewPopup] = useState(null);
   var reviewShownRef = useRef(false);
+  var isPullDataRef = useRef(false);
+  var lastLocalEditRef = useRef(0);
 
   useEffect(function() {
     Promise.all([loadShared(DEFAULT_DATA), loadMemory()]).then(function(results) {
@@ -411,6 +417,7 @@ export default function App() {
 
   useEffect(function() {
     if (!loaded) return;
+    if (isPullDataRef.current) { isPullDataRef.current = false; return; }
     setSyncing(true);
     var t = setTimeout(async function() { await saveShared(data); setSyncing(false); setLastSync(new Date()); }, 800);
     return function(){ clearTimeout(t); };
@@ -418,7 +425,11 @@ export default function App() {
 
   useEffect(function() {
     if (!loaded) return;
-    async function pull() { var r = await loadShared(null); if (r) setDataRaw(r); }
+    async function pull() {
+      if (Date.now() - lastLocalEditRef.current < 1500) return;
+      var r = await loadShared(null);
+      if (r) { isPullDataRef.current = true; setDataRaw(r); setLastSync(new Date()); }
+    }
     var iv = setInterval(pull, 10000);
     document.addEventListener('visibilitychange', pull);
     window.addEventListener('focus', pull);
@@ -428,7 +439,7 @@ export default function App() {
   async function manualSync() {
     setSyncing(true);
     var r = await loadShared(null);
-    if (r) setDataRaw(r);
+    if (r) { isPullDataRef.current = true; setDataRaw(r); }
     setSyncing(false);
     setLastSync(new Date());
   }
@@ -454,7 +465,7 @@ export default function App() {
     }
   }, [loaded]);
 
-  function setData(fn) { setDataRaw(function(d){ return typeof fn === "function" ? fn(d) : fn; }); }
+  function setData(fn) { lastLocalEditRef.current = Date.now(); setDataRaw(function(d){ return typeof fn === "function" ? fn(d) : fn; }); }
   function notify(msg) { setNotif(msg); setTimeout(function(){ setNotif(""); }, 2500); }
   function isMonthClosed(y, m) {
     var idx = y * 12 + m;
