@@ -518,12 +518,24 @@ export default function App() {
 
   // Spaar
   var spaarMonth = useMemo(function() {
-    if (data.spaar[mk]) return data.spaar[mk];
-    var prevMk = month === 0 ? (year-1)+"-11" : year+"-"+(month-1);
-    var prev = data.spaar[prevMk];
-    return prev
-      ? prev.map(function(p){ return Object.assign({},p,{actual:null}); })
-      : DEFAULT_SPAAR.map(function(p){ return Object.assign({},p,{actual:null}); });
+    var raw;
+    if (data.spaar[mk]) {
+      raw = data.spaar[mk];
+    } else {
+      var prevMk = month === 0 ? (year-1)+"-11" : year+"-"+(month-1);
+      var prev = data.spaar[prevMk];
+      raw = prev
+        ? prev.map(function(p){ return Object.assign({},p,{actual:null}); })
+        : DEFAULT_SPAAR.map(function(p){ return Object.assign({},p,{actual:null}); });
+    }
+    return raw.map(function(p) {
+      if (p.label && p.owner) return p;
+      var def = DEFAULT_SPAAR.find(function(d){ return d.id === p.id; });
+      return Object.assign({}, p, {
+        label: p.label || (def ? def.label : "Potje"),
+        owner: p.owner || (def ? def.owner : "dirk"),
+      });
+    });
   }, [mk, data.spaar]);
 
   function saveSpaar(arr) {
