@@ -94,6 +94,29 @@ const DEFAULT_DATA = {
   spaar:   {},
 };
 
+// Herstel null labels/owners in spaar data (was beschadigd door een oude bug in updateSpaar)
+function repairSpaarData(data) {
+  var spaar = data.spaar || {};
+  var changed = false;
+  var newSpaar = {};
+  Object.keys(spaar).forEach(function(mk) {
+    var arr = spaar[mk];
+    if (!Array.isArray(arr)) { newSpaar[mk] = arr; return; }
+    var fixed = arr.map(function(p) {
+      if (p.label != null && p.owner != null) return p;
+      changed = true;
+      var def = DEFAULT_SPAAR.find(function(x){ return x.id === p.id; });
+      return Object.assign({}, p, {
+        label: p.label != null ? p.label : (def ? def.label : "Potje"),
+        owner: p.owner != null ? p.owner : (def ? def.owner : "dirk"),
+      });
+    });
+    newSpaar[mk] = fixed;
+  });
+  if (!changed) return data;
+  return Object.assign({}, data, { spaar: newSpaar });
+}
+
 // Transaction classification
 function classifyTx(code, name, omschr) {
   const c = (code||"").toLowerCase();
@@ -409,9 +432,13 @@ export default function App() {
 
   useEffect(function() {
     Promise.all([loadShared(DEFAULT_DATA), loadMemory()]).then(function(results) {
-      setDataRaw(results[0]);
+      var raw = results[0];
+      var repaired = repairSpaarData(raw);
+      isPullDataRef.current = true; // voorkom dat initial load 800ms later terugschrijft
+      setDataRaw(repaired);
       setMemory(results[1]);
       setLoaded(true);
+      if (repaired !== raw) saveShared(repaired); // eenmalig gecorrigeerde data terugschrijven
     });
   }, []);
 
@@ -426,14 +453,20 @@ export default function App() {
   useEffect(function() {
     if (!loaded) return;
     async function pull() {
-      if (Date.now() - lastLocalEditRef.current < 1500) return;
+      if (Date.now() - lastLocalEditRef.current < 2000) return;
       var r = await loadShared(null);
-      if (r) { isPullDataRef.current = true; setDataRaw(r); setLastSync(new Date()); }
+      // Dubbele check: als gebruiker tijdens de async fetch heeft geëditeerd, pull weggooien
+      if (!r || Date.now() - lastLocalEditRef.current < 2000) return;
+      isPullDataRef.current = true;
+      setDataRaw(r);
+      setLastSync(new Date());
     }
     var iv = setInterval(pull, 10000);
-    document.addEventListener('visibilitychange', pull);
+    // Alleen pullen wanneer pagina weer zichtbaar wordt, niet bij verbergen
+    function onVisible() { if (!document.hidden) pull(); }
+    document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', pull);
-    return function(){ clearInterval(iv); document.removeEventListener('visibilitychange', pull); window.removeEventListener('focus', pull); };
+    return function(){ clearInterval(iv); document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('focus', pull); };
   }, [loaded]);
 
   async function manualSync() {
@@ -529,11 +562,11 @@ export default function App() {
         : DEFAULT_SPAAR.map(function(p){ return Object.assign({},p,{actual:null}); });
     }
     return raw.map(function(p) {
-      if (p.label && p.owner) return p;
+      if (p.label != null && p.owner != null) return p;
       var def = DEFAULT_SPAAR.find(function(d){ return d.id === p.id; });
       return Object.assign({}, p, {
-        label: p.label || (def ? def.label : "Potje"),
-        owner: p.owner || (def ? def.owner : "dirk"),
+        label: p.label != null ? p.label : (def ? def.label : "Potje"),
+        owner: p.owner != null ? p.owner : (def ? def.owner : "dirk"),
       });
     });
   }, [mk, data.spaar]);
