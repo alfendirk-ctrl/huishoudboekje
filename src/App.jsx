@@ -534,8 +534,14 @@ export default function App() {
     });
   }
   function updateSpaar(id, field, val) {
-    var num = parseFloat(String(val||"").replace(",","."));
-    saveSpaar(spaarMonth.map(function(p){ return p.id===id ? Object.assign({},p,{ [field]: isNaN(num)?(field==="planned"?0:null):num }) : p; }));
+    var stored;
+    if (field === "planned" || field === "actual") {
+      var num = parseFloat(String(val||"").replace(",","."));
+      stored = isNaN(num) ? (field === "planned" ? 0 : null) : num;
+    } else {
+      stored = val;
+    }
+    saveSpaar(spaarMonth.map(function(p){ return p.id===id ? Object.assign({},p,{ [field]: stored }) : p; }));
   }
 
   // Computed
