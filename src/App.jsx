@@ -461,7 +461,7 @@ export default function App() {
       setDataRaw(r);
       setLastSync(new Date());
     }
-    var iv = setInterval(pull, 10000);
+    var iv = setInterval(pull, 30000);
     // Alleen pullen wanneer pagina weer zichtbaar wordt, niet bij verbergen
     function onVisible() { if (!document.hidden) pull(); }
     document.addEventListener('visibilitychange', onVisible);
