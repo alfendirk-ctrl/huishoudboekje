@@ -76,19 +76,19 @@ const DEFAULT_POSTS = [
 ];
 
 const DEFAULT_SPAAR = [
-  { id:"sp_d1", owner:"dirk",    label:"Spaarrekening",   planned:150 },
-  { id:"sp_d2", owner:"dirk",    label:"Vakantie",        planned:75  },
-  { id:"sp_d3", owner:"dirk",    label:"Buffer",          planned:75  },
-  { id:"sp_d4", owner:"dirk",    label:"Maeve potje",     planned:75  },
-  { id:"sp_d5", owner:"dirk",    label:"Beleggen",        planned:250 },
-  { id:"sp_d6", owner:"dirk",    label:"Crypto",          planned:25  },
-  { id:"sp_s1", owner:"shelley", label:"Spaarrekening",   planned:50  },
-  { id:"sp_s2", owner:"shelley", label:"Maeve spaarrek.", planned:25  },
-  { id:"sp_s3", owner:"shelley", label:"By Bae",          planned:50  },
+  { id:"sp_d1", owner:"dirk",    label:"Spaarrekening",   planned:150, type:"sparen"   },
+  { id:"sp_d2", owner:"dirk",    label:"Vakantie",        planned:75,  type:"sparen"   },
+  { id:"sp_d3", owner:"dirk",    label:"Buffer",          planned:75,  type:"sparen"   },
+  { id:"sp_d4", owner:"dirk",    label:"Maeve potje",     planned:75,  type:"sparen"   },
+  { id:"sp_d5", owner:"dirk",    label:"Beleggen",        planned:250, type:"beleggen" },
+  { id:"sp_d6", owner:"dirk",    label:"Crypto",          planned:25,  type:"beleggen" },
+  { id:"sp_s1", owner:"shelley", label:"Spaarrekening",   planned:50,  type:"sparen"   },
+  { id:"sp_s2", owner:"shelley", label:"Maeve spaarrek.", planned:25,  type:"sparen"   },
+  { id:"sp_s3", owner:"shelley", label:"By Bae",          planned:50,  type:"sparen"   },
 ];
 
 const DEFAULT_DATA = {
-  inkomen: { dirk:3367, shelley:2261 },
+  inkomen: { dirk:3367, shelley:2261, extra:[] },
   groups:  DEFAULT_GROUPS,
   months:  {},
   spaar:   {},
@@ -103,12 +103,13 @@ function repairSpaarData(data) {
     var arr = spaar[mk];
     if (!Array.isArray(arr)) { newSpaar[mk] = arr; return; }
     var fixed = arr.map(function(p) {
-      if (p.label != null && p.owner != null) return p;
+      if (p.label != null && p.owner != null && p.type != null) return p;
       changed = true;
       var def = DEFAULT_SPAAR.find(function(x){ return x.id === p.id; });
       return Object.assign({}, p, {
         label: p.label != null ? p.label : (def ? def.label : "Potje"),
         owner: p.owner != null ? p.owner : (def ? def.owner : "dirk"),
+        type:  p.type  != null ? p.type  : (def ? def.type  : "sparen"),
       });
     });
     newSpaar[mk] = fixed;
@@ -286,7 +287,7 @@ var CSS_STR = [
   ".check-row{display:grid;grid-template-columns:1fr 80px 88px 72px;gap:0 .4rem;align-items:center;}",
   ".check-head{display:grid;grid-template-columns:1fr 80px 88px 72px;gap:0 .4rem;}",
   ".post-row{display:grid;grid-template-columns:1fr 88px 40px;gap:.5rem;align-items:center;}",
-  ".spaar-row{display:grid;grid-template-columns:1fr 80px 88px 40px;gap:.5rem;align-items:center;}",
+  ".spaar-row{display:grid;grid-template-columns:1fr 68px 80px 40px 40px;gap:.5rem;align-items:center;}",
   "@media(max-width:640px){",
   "  .kpi-grid{grid-template-columns:repeat(2,1fr);}",
   "  .kpi-5{grid-column:1/-1;}",
@@ -295,7 +296,7 @@ var CSS_STR = [
   "  .check-head{grid-template-columns:1fr 76px 82px;}",
   "  .diff-col{display:none;}",
   "  .post-row{grid-template-columns:1fr 80px 40px;}",
-  "  .spaar-row{grid-template-columns:1fr 64px 80px 40px;}",
+  "  .spaar-row{grid-template-columns:1fr 56px 72px 36px 36px;}",
   "  .tab-btn{padding:.55rem .7rem;font-size:.78rem;}",
   "  .header-inner{flex-direction:column;align-items:flex-start;gap:.5rem;}",
   "  .card-pad{padding:.9rem;}",
@@ -562,11 +563,12 @@ export default function App() {
         : DEFAULT_SPAAR.map(function(p){ return Object.assign({},p,{actual:null}); });
     }
     return raw.map(function(p) {
-      if (p.label != null && p.owner != null) return p;
+      if (p.label != null && p.owner != null && p.type != null) return p;
       var def = DEFAULT_SPAAR.find(function(d){ return d.id === p.id; });
       return Object.assign({}, p, {
         label: p.label != null ? p.label : (def ? def.label : "Potje"),
         owner: p.owner != null ? p.owner : (def ? def.owner : "dirk"),
+        type:  p.type  != null ? p.type  : (def ? def.type  : "sparen"),
       });
     });
   }, [mk, data.spaar]);
@@ -589,10 +591,33 @@ export default function App() {
     saveSpaar(spaarMonth.map(function(p){ return p.id===id ? Object.assign({},p,{ [field]: stored }) : p; }));
   }
 
+  function addExtraInk() {
+    setData(function(d) {
+      var extra = [...(d.inkomen.extra||[]), {id:newId(), label:"Extra inkomsten", planned:0}];
+      return Object.assign({},d,{inkomen:Object.assign({},d.inkomen,{extra:extra})});
+    });
+  }
+  function updateExtraInk(id, field, val) {
+    var stored = field === "planned" ? (parseFloat(String(val||"").replace(",",".")) || 0) : val;
+    setData(function(d) {
+      var extra = (d.inkomen.extra||[]).map(function(e){ return e.id===id ? Object.assign({},e,{[field]:stored}) : e; });
+      return Object.assign({},d,{inkomen:Object.assign({},d.inkomen,{extra:extra})});
+    });
+  }
+  function deleteExtraInk(id) {
+    setData(function(d) {
+      var extra = (d.inkomen.extra||[]).filter(function(e){ return e.id!==id; });
+      return Object.assign({},d,{inkomen:Object.assign({},d.inkomen,{extra:extra})});
+    });
+  }
+
   // Computed
-  var totInk = data.inkomen.dirk + data.inkomen.shelley;
-  var ratioD = totInk > 0 ? data.inkomen.dirk / totInk : 0.5;
+  var extraItems = data.inkomen.extra || [];
+  var extraInk   = extraItems.reduce(function(s,e){ return s+(e.planned||0); }, 0);
+  var salariesTot = data.inkomen.dirk + data.inkomen.shelley;
+  var ratioD = salariesTot > 0 ? data.inkomen.dirk / salariesTot : 0.5;
   var ratioS = 1 - ratioD;
+  var totInk = salariesTot + extraInk;
 
   var groupTotals = useMemo(function() {
     var map = {};
@@ -608,11 +633,13 @@ export default function App() {
 
   var sV = (groupTotals["samen_vast"] && groupTotals["samen_vast"].planned) || 0;
   var sR = (groupTotals["samen_var"]  && groupTotals["samen_var"].planned)  || 0;
-  var availD = data.inkomen.dirk    - sV*ratioD - sR*ratioD - ((groupTotals["dirk"]    && groupTotals["dirk"].planned)    || 0);
-  var availS = data.inkomen.shelley - sV*ratioS - sR*ratioS - ((groupTotals["shelley"] && groupTotals["shelley"].planned) || 0);
+  var availD = data.inkomen.dirk    + extraInk*ratioD - sV*ratioD - sR*ratioD - ((groupTotals["dirk"]    && groupTotals["dirk"].planned)    || 0);
+  var availS = data.inkomen.shelley + extraInk*ratioS - sV*ratioS - sR*ratioS - ((groupTotals["shelley"] && groupTotals["shelley"].planned) || 0);
   var allocD = spaarMonth.filter(function(p){ return p.owner==="dirk"; }).reduce(function(s,p){ return s+(p.planned||0); }, 0);
   var allocS = spaarMonth.filter(function(p){ return p.owner==="shelley"; }).reduce(function(s,p){ return s+(p.planned||0); }, 0);
-  var totSpaar    = allocD + allocS;
+  var totSpaar     = allocD + allocS;
+  var totSpaarOnly = spaarMonth.filter(function(p){ return p.type !== "beleggen"; }).reduce(function(s,p){ return s+(p.planned||0); }, 0);
+  var totBeleg     = spaarMonth.filter(function(p){ return p.type === "beleggen"; }).reduce(function(s,p){ return s+(p.planned||0); }, 0);
   var totSpaarAct = spaarMonth.reduce(function(s,p){ return s + (p.actual !== null && p.actual !== undefined ? p.actual : (p.planned||0)); }, 0);
 
   var chartData = useMemo(function() {
@@ -878,6 +905,34 @@ export default function App() {
                 </div>
               </Card>
 
+              <Card>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:".85rem" }}>
+                  <Sec>Extra inkomsten</Sec>
+                  {extraInk > 0 && <span style={{ fontSize:".82rem", fontWeight:600, color:"var(--green)" }}>{fmt(extraInk)}</span>}
+                </div>
+                {extraItems.length === 0 && (
+                  <div style={{ fontSize:".78rem", color:"var(--text3)", marginBottom:".6rem" }}>
+                    Bijv. kinderopvangtoeslag, teruggave belasting, bonus
+                  </div>
+                )}
+                {extraItems.map(function(item) {
+                  return (
+                    <div key={item.id} className="post-row row-hover" style={{ padding:".3rem .25rem", marginBottom:".15rem" }}>
+                      <input value={item.label} onChange={function(e){ updateExtraInk(item.id,"label",e.target.value); }} style={Object.assign({},inpFull,{border:"none",borderBottom:"1px solid var(--border2)",borderRadius:0,background:"transparent",fontSize:".85rem"})}/>
+                      <NumInput value={item.planned||""} onChange={function(v){ updateExtraInk(item.id,"planned",v); }} placeholder="0" accentColor="var(--green)"/>
+                      <button style={delBtn} onClick={function(){ deleteExtraInk(item.id); }}
+                        onMouseEnter={function(e){ e.target.style.color="var(--red)"; e.target.style.background="var(--red-l)"; }}
+                        onMouseLeave={function(e){ e.target.style.color="var(--text3)"; e.target.style.background="none"; }}>✕</button>
+                    </div>
+                  );
+                })}
+                <button style={addBtn} onClick={addExtraInk}
+                  onMouseEnter={function(e){ e.target.style.borderColor="var(--green)"; e.target.style.color="var(--green)"; }}
+                  onMouseLeave={function(e){ e.target.style.borderColor="var(--border2)"; e.target.style.color="var(--text3)"; }}>
+                  + Extra inkomsten toevoegen
+                </button>
+              </Card>
+
               {groups.map(function(group) {
                 var gPosts = posts.filter(function(p){ return p.group === group.id; });
                 var total  = gPosts.reduce(function(s,p){ return s+(p.planned||0); }, 0);
@@ -932,15 +987,20 @@ export default function App() {
                 <AvailBar user={DIRK}    available={availD} allocated={allocD}/>
                 <AvailBar user={SHELLEY} available={availS} allocated={allocS}/>
               </div>
+
+              {/* Sparen & Buffer */}
               <Card>
-                <Sec>Potjes &amp; Beleggen</Sec>
-                <div className="spaar-row" style={{ paddingBottom:".4rem", borderBottom:"1px solid var(--border)", marginBottom:".5rem" }}>
-                  {["Naam","Persoon","Bedrag",""].map(function(h,i){ return <span key={i} style={Object.assign({},colHead,{textAlign:i>=2&&i<3?"right":"left"})}>{h.toUpperCase()}</span>; })}
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:".85rem" }}>
+                  <Sec>Sparen &amp; Buffer</Sec>
+                  <span style={{ fontSize:".82rem", fontWeight:600, color:DIRK.color }}>{fmt(totSpaarOnly)}</span>
                 </div>
-                {spaarMonth.map(function(p) {
+                <div className="spaar-row" style={{ paddingBottom:".4rem", borderBottom:"1px solid var(--border)", marginBottom:".5rem" }}>
+                  {["Naam","Persoon","Bedrag","",""].map(function(h,i){ return <span key={i} style={Object.assign({},colHead,{textAlign:i===2?"right":"left"})}>{h.toUpperCase()}</span>; })}
+                </div>
+                {spaarMonth.filter(function(p){ return p.type !== "beleggen"; }).map(function(p) {
                   var u = USERS.find(function(u){ return u.id===p.owner; });
                   return (
-                    <div key={p.id} className="row-hover" className="spaar-row row-hover" style={{ padding:".3rem .25rem", marginBottom:".15rem" }}>
+                    <div key={p.id} className="spaar-row row-hover" style={{ padding:".3rem .25rem", marginBottom:".15rem" }}>
                       <input value={p.label} onChange={function(e){ updateSpaar(p.id,"label",e.target.value); }} style={Object.assign({},inpFull,{border:"none",background:"transparent",fontSize:".85rem"})}/>
                       <select value={p.owner} onChange={function(e){ updateSpaar(p.id,"owner",e.target.value); }}
                         style={{ border:"1px solid var(--border2)", borderRadius:6, padding:".3rem .4rem", fontSize:".78rem", color: u ? u.color : "inherit", background: u ? u.light : "white", fontFamily:"inherit", outline:"none" }}>
@@ -948,14 +1008,57 @@ export default function App() {
                         <option value="shelley">Shelley</option>
                       </select>
                       <NumInput value={p.planned||""} onChange={function(v){ updateSpaar(p.id,"planned",v); }} placeholder="0" accentColor={u ? u.color : undefined}/>
+                      <button title="Verplaats naar Beleggen" onClick={function(){ updateSpaar(p.id,"type","beleggen"); }}
+                        style={{ background:"none", border:"1px solid var(--border2)", color:"var(--text3)", cursor:"pointer", fontSize:".72rem", borderRadius:6, padding:"4px 6px", minWidth:36, minHeight:36, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"inherit" }}
+                        onMouseEnter={function(e){ e.currentTarget.style.borderColor="#7c3aed"; e.currentTarget.style.color="#7c3aed"; }}
+                        onMouseLeave={function(e){ e.currentTarget.style.borderColor="var(--border2)"; e.currentTarget.style.color="var(--text3)"; }}>→</button>
                       <button style={delBtn} onClick={function(){ saveSpaar(spaarMonth.filter(function(x){ return x.id!==p.id; })); }}
                         onMouseEnter={function(e){ e.target.style.color="var(--red)"; e.target.style.background="var(--red-l)"; }}
                         onMouseLeave={function(e){ e.target.style.color="var(--text3)"; e.target.style.background="none"; }}>✕</button>
                     </div>
                   );
                 })}
-                <button style={Object.assign({},addBtn,{borderColor:"#ddd6fe",color:"#7c3aed"})} onClick={function(){ saveSpaar([...spaarMonth,{id:newId(),owner:"dirk",label:"Nieuw potje",planned:0,actual:null}]); }}>
+                <button style={addBtn} onClick={function(){ saveSpaar([...spaarMonth,{id:newId(),owner:"dirk",label:"Nieuw potje",planned:0,actual:null,type:"sparen"}]); }}
+                  onMouseEnter={function(e){ e.target.style.borderColor=DIRK.color; e.target.style.color=DIRK.color; }}
+                  onMouseLeave={function(e){ e.target.style.borderColor="var(--border2)"; e.target.style.color="var(--text3)"; }}>
                   + Potje toevoegen
+                </button>
+              </Card>
+
+              {/* Beleggen */}
+              <Card>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:".85rem" }}>
+                  <Sec>Beleggen</Sec>
+                  <span style={{ fontSize:".82rem", fontWeight:600, color:"#7c3aed" }}>{fmt(totBeleg)}</span>
+                </div>
+                <div className="spaar-row" style={{ paddingBottom:".4rem", borderBottom:"1px solid var(--border)", marginBottom:".5rem" }}>
+                  {["Naam","Persoon","Bedrag","",""].map(function(h,i){ return <span key={i} style={Object.assign({},colHead,{textAlign:i===2?"right":"left"})}>{h.toUpperCase()}</span>; })}
+                </div>
+                {spaarMonth.filter(function(p){ return p.type === "beleggen"; }).map(function(p) {
+                  var u = USERS.find(function(u){ return u.id===p.owner; });
+                  return (
+                    <div key={p.id} className="spaar-row row-hover" style={{ padding:".3rem .25rem", marginBottom:".15rem" }}>
+                      <input value={p.label} onChange={function(e){ updateSpaar(p.id,"label",e.target.value); }} style={Object.assign({},inpFull,{border:"none",background:"transparent",fontSize:".85rem"})}/>
+                      <select value={p.owner} onChange={function(e){ updateSpaar(p.id,"owner",e.target.value); }}
+                        style={{ border:"1px solid var(--border2)", borderRadius:6, padding:".3rem .4rem", fontSize:".78rem", color: u ? u.color : "inherit", background: u ? u.light : "white", fontFamily:"inherit", outline:"none" }}>
+                        <option value="dirk">Dirk</option>
+                        <option value="shelley">Shelley</option>
+                      </select>
+                      <NumInput value={p.planned||""} onChange={function(v){ updateSpaar(p.id,"planned",v); }} placeholder="0" accentColor="#7c3aed"/>
+                      <button title="Verplaats naar Sparen" onClick={function(){ updateSpaar(p.id,"type","sparen"); }}
+                        style={{ background:"none", border:"1px solid var(--border2)", color:"var(--text3)", cursor:"pointer", fontSize:".72rem", borderRadius:6, padding:"4px 6px", minWidth:36, minHeight:36, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"inherit" }}
+                        onMouseEnter={function(e){ e.currentTarget.style.borderColor=DIRK.color; e.currentTarget.style.color=DIRK.color; }}
+                        onMouseLeave={function(e){ e.currentTarget.style.borderColor="var(--border2)"; e.currentTarget.style.color="var(--text3)"; }}>←</button>
+                      <button style={delBtn} onClick={function(){ saveSpaar(spaarMonth.filter(function(x){ return x.id!==p.id; })); }}
+                        onMouseEnter={function(e){ e.target.style.color="var(--red)"; e.target.style.background="var(--red-l)"; }}
+                        onMouseLeave={function(e){ e.target.style.color="var(--text3)"; e.target.style.background="none"; }}>✕</button>
+                    </div>
+                  );
+                })}
+                <button style={Object.assign({},addBtn,{borderColor:"#ddd6fe",color:"#7c3aed"})} onClick={function(){ saveSpaar([...spaarMonth,{id:newId(),owner:"dirk",label:"Nieuwe belegging",planned:0,actual:null,type:"beleggen"}]); }}
+                  onMouseEnter={function(e){ e.target.style.borderColor="#7c3aed"; e.target.style.color="#7c3aed"; }}
+                  onMouseLeave={function(e){ e.target.style.borderColor="#ddd6fe"; e.target.style.color="#7c3aed"; }}>
+                  + Belegging toevoegen
                 </button>
                 <div style={{ marginTop:"1rem", paddingTop:".75rem", borderTop:"1px solid var(--border)", display:"flex", justifyContent:"space-between", fontSize:".84rem" }}>
                   <span style={{ color:"var(--text2)" }}>Totaal verdeeld</span>
@@ -995,17 +1098,32 @@ export default function App() {
                           </div>
                         );
                       })}
+                      {extraInk > 0 && (
+                        <div style={{ display:"flex", justifyContent:"space-between", padding:".3rem 0", borderBottom:"1px solid var(--border)", fontSize:".82rem" }}>
+                          <span style={{ color:"var(--text2)" }}>Extra inkomsten</span>
+                          <span style={{ color:"var(--green)", fontWeight:500 }}>+{fmt(extraInk*ratio)}</span>
+                        </div>
+                      )}
                       <div style={{ display:"flex", justifyContent:"space-between", padding:".65rem 0 .4rem", fontSize:".88rem" }}>
                         <span style={{ color:"var(--text2)", fontWeight:500 }}>Vrij voor sparen</span>
                         <span style={{ color:u.color, fontWeight:700 }}>{fmt(avail)}</span>
                       </div>
                       <Bar value={alloc} max={avail} color={u.color} height={4}/>
-                      <div style={{ fontSize:".72rem", color:"var(--text2)", margin:".5rem 0 .25rem" }}>Sparen &amp; beleggen:</div>
-                      {spaarMonth.filter(function(p){ return p.owner===uid; }).map(function(p) {
+                      {["sparen","beleggen"].map(function(typeKey) {
+                        var typePots = spaarMonth.filter(function(p){ return p.owner===uid && (typeKey==="beleggen" ? p.type==="beleggen" : p.type !== "beleggen"); });
+                        if (!typePots.length) return null;
+                        var typeColor = typeKey === "beleggen" ? "#7c3aed" : u.color;
                         return (
-                          <div key={p.id} style={{ display:"flex", justifyContent:"space-between", fontSize:".76rem", marginBottom:".18rem" }}>
-                            <span style={{ color:"var(--text3)" }}>{p.label}</span>
-                            <span style={{ color:"#7c3aed" }}>-{fmt(p.planned)}</span>
+                          <div key={typeKey}>
+                            <div style={{ fontSize:".68rem", color:"var(--text3)", margin:".5rem 0 .2rem", fontWeight:600, letterSpacing:".06em" }}>{typeKey === "beleggen" ? "BELEGGEN" : "SPAREN"}</div>
+                            {typePots.map(function(p) {
+                              return (
+                                <div key={p.id} style={{ display:"flex", justifyContent:"space-between", fontSize:".76rem", marginBottom:".18rem" }}>
+                                  <span style={{ color:"var(--text3)" }}>{p.label}</span>
+                                  <span style={{ color:typeColor }}>-{fmt(p.planned)}</span>
+                                </div>
+                              );
+                            })}
                           </div>
                         );
                       })}
@@ -1020,6 +1138,14 @@ export default function App() {
 
               <Card>
                 <Sec>Spaardoel - 1.000 / maand</Sec>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:".3rem" }}>
+                  <span style={{ fontSize:".82rem", color:"var(--text2)" }}>Sparen &amp; buffer</span>
+                  <span style={{ fontWeight:600, color:DIRK.color }}>{fmt(totSpaarOnly)}</span>
+                </div>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:".5rem" }}>
+                  <span style={{ fontSize:".82rem", color:"var(--text2)" }}>Beleggen</span>
+                  <span style={{ fontWeight:600, color:"#7c3aed" }}>{fmt(totBeleg)}</span>
+                </div>
                 <div style={{ display:"flex", justifyContent:"space-between", marginBottom:".5rem" }}>
                   <span style={{ fontSize:".84rem", color:"var(--text2)" }}>Totaal sparen + beleggen</span>
                   <span style={{ fontWeight:700, color: totSpaar>=1000 ? "var(--green)" : totSpaar>=800 ? "var(--orange)" : "var(--red)" }}>{fmt(totSpaar)}</span>

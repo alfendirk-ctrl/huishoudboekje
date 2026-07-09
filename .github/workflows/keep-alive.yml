@@ -2,7 +2,7 @@ name: Keep Supabase Active
 
 on:
   schedule:
-    - cron: '0 8 */5 * *'  # elke 5 dagen om 08:00 UTC
+    - cron: '0 8 */2 * *'  # elke 2 dagen om 08:00 UTC
   workflow_dispatch:        # ook handmatig te starten
 
 jobs:
