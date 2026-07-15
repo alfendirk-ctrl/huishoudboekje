@@ -9,10 +9,14 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase storage table
+      - name: Schrijf keep-alive naar Supabase
         run: |
           curl -sf \
-            "${{ secrets.VITE_SUPABASE_URL }}/rest/v1/storage?select=key&limit=1" \
+            "${{ secrets.VITE_SUPABASE_URL }}/rest/v1/storage" \
+            -X POST \
             -H "apikey: ${{ secrets.VITE_SUPABASE_ANON }}" \
             -H "Authorization: Bearer ${{ secrets.VITE_SUPABASE_ANON }}" \
-            && echo "Supabase actief" || echo "Ping mislukt"
+            -H "Content-Type: application/json" \
+            -H "Prefer: resolution=merge-duplicates" \
+            -d "{\"key\":\"__keepalive__\",\"value\":\"\\\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\\\"\"}" \
+            && echo "Keep-alive geschreven" || echo "Mislukt"
