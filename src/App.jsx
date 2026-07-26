@@ -478,6 +478,14 @@ export default function App() {
     setLastSync(new Date());
   }
 
+  async function forcePush() {
+    setSyncing(true);
+    await saveShared(data);
+    setSyncing(false);
+    setLastSync(new Date());
+    notify("Data gepushed naar cloud ✓");
+  }
+
   useEffect(function() {
     if (!loaded || reviewShownRef.current) return;
     var prevM = month === 0 ? 11 : month - 1;
@@ -836,9 +844,12 @@ export default function App() {
                 <span style={{ fontFamily:"Fraunces,serif", fontStyle:"italic", fontWeight:300, fontSize:".95rem", color:"var(--text2)" }}>Dirk &amp; Shelley</span>
               </div>
               <div style={{ display:"flex", alignItems:"center", gap:".75rem" }}>
-                <button onClick={manualSync} title="Nu synchroniseren" style={{ display:"flex", alignItems:"center", gap:".4rem", fontSize:".75rem", color:"var(--text3)", background:"none", border:"none", cursor:"pointer", padding:"2px 4px", borderRadius:6, fontFamily:"inherit", WebkitTapHighlightColor:"transparent" }}>
+                <button onClick={manualSync} title="Ophalen uit cloud" style={{ display:"flex", alignItems:"center", gap:".4rem", fontSize:".75rem", color:"var(--text3)", background:"none", border:"none", cursor:"pointer", padding:"2px 4px", borderRadius:6, fontFamily:"inherit", WebkitTapHighlightColor:"transparent" }}>
                   <div style={{ width:8, height:8, borderRadius:"50%", background: syncing ? "var(--orange)" : "var(--green)", flexShrink:0 }}/>
-                  {syncing ? "Opslaan..." : lastSync ? "Gesynchroniseerd" : "Gedeeld"}
+                  {syncing ? "Bezig..." : lastSync ? "Gesynchroniseerd" : "Gedeeld"}
+                </button>
+                <button onClick={forcePush} title="Mijn data pushen naar cloud" style={{ display:"flex", alignItems:"center", gap:".25rem", fontSize:".72rem", color:"var(--text3)", background:"none", border:"1px solid var(--border)", cursor:"pointer", padding:"2px 7px", borderRadius:6, fontFamily:"inherit", WebkitTapHighlightColor:"transparent" }}>
+                  ↑ Push
                 </button>
                 <span className="badge" style={{ color:DIRK.color,    background:DIRK.light,    border:"1px solid "+DIRK.border    }}>D {Math.round(ratioD*100)}%</span>
                 <span className="badge" style={{ color:SHELLEY.color, background:SHELLEY.light, border:"1px solid "+SHELLEY.border }}>S {Math.round(ratioS*100)}%</span>
@@ -1376,29 +1387,42 @@ export default function App() {
               })}
 
               <Card className="card-pad" style={{ padding:"1rem 1.1rem" }}>
-                <div className="check-row" style={{ padding:".35rem .4rem", marginBottom:".35rem" }}>
+                <div className="check-row" style={{ padding:".35rem .4rem", marginBottom:".5rem" }}>
                   <span style={{ fontWeight:600, fontSize:".88rem" }}>Sparen &amp; Beleggen</span>
                   <span style={{ textAlign:"right", fontSize:".84rem", color:"var(--text2)", fontWeight:500 }}>{fmt(totSpaar)}</span>
                   <span style={{ textAlign:"right", fontSize:".84rem", fontWeight:600 }}>{fmt(totSpaarAct)}</span>
                   <div style={{ display:"flex", justifyContent:"flex-end" }}><DiffBadge planned={totSpaar} actual={totSpaarAct}/></div>
                 </div>
-                <div style={{ borderTop:"1px solid var(--border)", marginBottom:".35rem" }}/>
-                {spaarMonth.map(function(p) {
-                  var u = USERS.find(function(u){ return u.id===p.owner; });
-                  return (
-                    <div key={p.id} className="row-hover" className="check-row row-hover" style={{ padding:".3rem .4rem" }}>
-                      <div style={{ display:"flex", alignItems:"center", gap:".4rem" }}>
-                        <span style={{ fontSize:".82rem", color:"var(--text2)" }}>{p.label}</span>
-                        {u && <span className="pill" style={{ color:u.color, background:u.light, border:"1px solid "+u.border }}>{u.name[0]}</span>}
-                      </div>
-                      <span style={{ textAlign:"right", fontSize:".8rem", color:"var(--text3)" }}>{fmt(p.planned)}</span>
-                      <div style={{ display:"flex", justifyContent:"flex-end" }}>
-                        <DecInput value={p.actual} onCommit={function(v){ updateSpaar(p.id,"actual",v); }} placeholder={String((p.planned||0).toFixed(0))} style={inpRight}/>
-                      </div>
-                      <div className="diff-col" style={{ display:"flex", justifyContent:"flex-end" }}><DiffBadge planned={p.planned} actual={p.actual}/></div>
-                    </div>
-                  );
-                })}
+                <button
+                  onClick={function() {
+                    saveSpaar(spaarMonth.map(function(p){ return Object.assign({},p,{actual:p.planned}); }));
+                    notify("Alles gespaard!");
+                  }}
+                  style={{ width:"100%", padding:".55rem", borderRadius:"var(--radius-sm)", border:"1px solid #bbf7d0", background:"var(--green-l)", color:"#16a34a", fontWeight:600, fontSize:".85rem", cursor:"pointer", fontFamily:"inherit", marginBottom:".6rem" }}
+                >
+                  ✓ Alles gespaard
+                </button>
+                <details>
+                  <summary style={{ fontSize:".78rem", color:"var(--text3)", cursor:"pointer", userSelect:"none", marginBottom:".35rem" }}>Uitzonderingen invoeren</summary>
+                  <div style={{ borderTop:"1px solid var(--border)", marginTop:".35rem", paddingTop:".35rem" }}>
+                    {spaarMonth.map(function(p) {
+                      var u = USERS.find(function(u){ return u.id===p.owner; });
+                      return (
+                        <div key={p.id} className="check-row row-hover" style={{ padding:".3rem .4rem" }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:".4rem" }}>
+                            <span style={{ fontSize:".82rem", color:"var(--text2)" }}>{p.label}</span>
+                            {u && <span className="pill" style={{ color:u.color, background:u.light, border:"1px solid "+u.border }}>{u.name[0]}</span>}
+                          </div>
+                          <span style={{ textAlign:"right", fontSize:".8rem", color:"var(--text3)" }}>{fmt(p.planned)}</span>
+                          <div style={{ display:"flex", justifyContent:"flex-end" }}>
+                            <DecInput value={p.actual} onCommit={function(v){ updateSpaar(p.id,"actual",v); }} placeholder={String((p.planned||0).toFixed(0))} style={inpRight}/>
+                          </div>
+                          <div className="diff-col" style={{ display:"flex", justifyContent:"flex-end" }}><DiffBadge planned={p.planned} actual={p.actual}/></div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </details>
               </Card>
 
               <Card style={{ background:"var(--text)", border:"none", padding:"1rem 1.25rem" }}>
