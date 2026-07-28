@@ -427,7 +427,7 @@ export default function App() {
   var [loaded, setLoaded]     = useState(false);
   var [memory, setMemory]     = useState({});  // learned desc->postId mappings
   var [reviewPopup, setReviewPopup] = useState(null);
-  var reviewShownRef = useRef(false);
+  var [reviewChecked, setReviewChecked] = useState({});
   var isPullDataRef = useRef(false);
   var lastLocalEditRef = useRef(0);
 
@@ -486,26 +486,6 @@ export default function App() {
     notify("Data gepushed naar cloud ✓");
   }
 
-  useEffect(function() {
-    if (!loaded || reviewShownRef.current) return;
-    var prevM = month === 0 ? 11 : month - 1;
-    var prevY = month === 0 ? year - 1 : year;
-    var prevMD = data.months[prevY + "-" + prevM];
-    if (!prevMD) return;
-    var prevPosts = prevMD.posts || [];
-    var prevActuals = prevMD.actuals || {};
-    var diffs = prevPosts.filter(function(p) {
-      var a = prevActuals[p.id];
-      return (a !== null && a !== undefined) && Math.abs(a - (p.planned || 0)) >= 10;
-    }).map(function(p) {
-      var a = prevActuals[p.id];
-      return { id:p.id, label:p.label, planned:p.planned||0, actual:a, diff:a-(p.planned||0) };
-    }).sort(function(a,b){ return Math.abs(b.diff)-Math.abs(a.diff); });
-    if (diffs.length > 0) {
-      reviewShownRef.current = true;
-      setReviewPopup({ month: MONTHS[prevM], year: prevY, diffs: diffs });
-    }
-  }, [loaded]);
 
   function setData(fn) { lastLocalEditRef.current = Date.now(); setDataRaw(function(d){ return typeof fn === "function" ? fn(d) : fn; }); }
   function notify(msg) { setNotif(msg); setTimeout(function(){ setNotif(""); }, 2500); }
@@ -541,7 +521,20 @@ export default function App() {
   }
   function closeCurrentMonth() {
     saveMonthData(Object.assign({}, monthData, { closed: true }));
+    var diffs = posts.filter(function(p) {
+      var a = actuals[p.id];
+      return (a !== null && a !== undefined) && Math.abs(a - (p.planned || 0)) >= 10;
+    }).map(function(p) {
+      var a = actuals[p.id];
+      return { id:p.id, label:p.label, planned:p.planned||0, actual:a, diff:a-(p.planned||0) };
+    }).sort(function(a,b){ return Math.abs(b.diff)-Math.abs(a.diff); });
     notify("Maand afgesloten");
+    if (diffs.length > 0) {
+      var initChecked = {};
+      diffs.forEach(function(d){ initChecked[d.id] = true; });
+      setReviewChecked(initChecked);
+      setReviewPopup({ month: MONTHS[month], year: year, monthIdx: month, diffs: diffs });
+    }
   }
   function setPosts(fn) {
     saveMonthData(Object.assign({}, monthData, { posts: typeof fn === "function" ? fn(posts) : fn }));
@@ -802,33 +795,60 @@ export default function App() {
 
         {reviewPopup && (
           <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.45)", zIndex:9998, display:"flex", alignItems:"center", justifyContent:"center", padding:"1rem" }}>
-            <div style={{ background:"var(--surface)", borderRadius:"var(--radius)", boxShadow:"var(--shadow-md)", maxWidth:480, width:"100%", maxHeight:"80vh", overflowY:"auto", padding:"1.5rem" }}>
+            <div style={{ background:"var(--surface)", borderRadius:"var(--radius)", boxShadow:"var(--shadow-md)", maxWidth:500, width:"100%", maxHeight:"85vh", overflowY:"auto", padding:"1.5rem" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"1rem" }}>
                 <div>
                   <h2 style={{ fontFamily:"Fraunces,serif", fontSize:"1.1rem", fontWeight:600, marginBottom:".3rem" }}>Terugblik {reviewPopup.month}</h2>
-                  <p style={{ fontSize:".8rem", color:"var(--text2)", lineHeight:1.4 }}>Deze posten weken vorige maand af van het plan. Wil je het budget bijstellen voor deze maand?</p>
+                  <p style={{ fontSize:".8rem", color:"var(--text2)", lineHeight:1.4 }}>Vink aan welke budgetten je wil bijstellen voor volgende maand.</p>
                 </div>
                 <button onClick={function(){ setReviewPopup(null); }} style={{ background:"none", border:"none", cursor:"pointer", fontSize:"1rem", color:"var(--text3)", padding:"0 0 0 .75rem", flexShrink:0 }}>✕</button>
               </div>
               <div style={{ border:"1px solid var(--border)", borderRadius:"var(--radius-sm)", overflow:"hidden", marginBottom:"1.25rem" }}>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 70px 70px 70px", background:"var(--surface2)", padding:".4rem .75rem", borderBottom:"1px solid var(--border)" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"28px 1fr 70px 70px 70px", background:"var(--surface2)", padding:".4rem .75rem", borderBottom:"1px solid var(--border)" }}>
+                  <span/>
                   {["Post","Gepland","Werkelijk","Verschil"].map(function(h,i){ return <span key={h} style={{ fontSize:".62rem", fontWeight:600, letterSpacing:".08em", color:"var(--text3)", textAlign:i===0?"left":"right" }}>{h.toUpperCase()}</span>; })}
                 </div>
                 {reviewPopup.diffs.map(function(d) {
                   var over = d.diff > 0;
+                  var checked = !!reviewChecked[d.id];
                   return (
-                    <div key={d.id} style={{ display:"grid", gridTemplateColumns:"1fr 70px 70px 70px", padding:".5rem .75rem", borderBottom:"1px solid var(--border)", alignItems:"center" }}>
+                    <label key={d.id} style={{ display:"grid", gridTemplateColumns:"28px 1fr 70px 70px 70px", padding:".5rem .75rem", borderBottom:"1px solid var(--border)", alignItems:"center", cursor:"pointer", background: checked ? "var(--dirk-l)" : "transparent" }}>
+                      <input type="checkbox" checked={checked} onChange={function(){ setReviewChecked(function(c){ return Object.assign({},c,{[d.id]:!c[d.id]}); }); }} style={{ width:15, height:15, accentColor:"var(--dirk)", cursor:"pointer" }}/>
                       <span style={{ fontSize:".83rem" }}>{d.label}</span>
                       <span style={{ fontSize:".79rem", color:"var(--text2)", textAlign:"right" }}>{fmt(d.planned)}</span>
                       <span style={{ fontSize:".79rem", textAlign:"right" }}>{fmt(d.actual)}</span>
                       <span style={{ fontSize:".79rem", fontWeight:600, textAlign:"right", color: over ? "var(--red)" : "var(--green)" }}>{over ? "+" : ""}{fmt(d.diff)}</span>
-                    </div>
+                    </label>
                   );
                 })}
               </div>
               <div style={{ display:"flex", gap:".6rem" }}>
-                <button style={ghostBtn} onClick={function(){ setReviewPopup(null); }}>Nu niet</button>
-                <button style={Object.assign({},primaryBtn,{flex:1})} onClick={function(){ setReviewPopup(null); setTab("plan"); }}>Maandplan aanpassen</button>
+                <button style={ghostBtn} onClick={function(){ setReviewPopup(null); }}>Overslaan</button>
+                <button style={Object.assign({},primaryBtn,{flex:1})} onClick={function() {
+                  var nextM = reviewPopup.monthIdx === 11 ? 0 : reviewPopup.monthIdx + 1;
+                  var nextY = reviewPopup.monthIdx === 11 ? reviewPopup.year + 1 : reviewPopup.year;
+                  var nextMk = nextY + "-" + nextM;
+                  setData(function(d) {
+                    var curMD = d.months[reviewPopup.year + "-" + reviewPopup.monthIdx];
+                    var basePosts = curMD ? (curMD.posts||[]) : [];
+                    var existing = d.months[nextMk];
+                    var existPosts = existing ? (existing.posts||[]) : basePosts.map(function(p){ return Object.assign({},p); });
+                    var updatedPosts = existPosts.map(function(p) {
+                      if (reviewChecked[p.id]) {
+                        var diff = reviewPopup.diffs.find(function(dx){ return dx.id === p.id; });
+                        if (diff) return Object.assign({},p,{planned:diff.actual});
+                      }
+                      return p;
+                    });
+                    var ms = Object.assign({}, d.months);
+                    ms[nextMk] = Object.assign({}, existing||{actuals:{}}, {posts:updatedPosts});
+                    return Object.assign({}, d, {months:ms});
+                  });
+                  setReviewPopup(null);
+                  setTab("plan");
+                  setMonth(nextM);
+                  notify("Budget bijgesteld voor " + MONTHS[nextM]);
+                }}>Aanpassen &amp; volgende maand</button>
               </div>
             </div>
           </div>
