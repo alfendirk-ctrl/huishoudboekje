@@ -868,9 +868,6 @@ export default function App() {
                   <div style={{ width:8, height:8, borderRadius:"50%", background: syncing ? "var(--orange)" : "var(--green)", flexShrink:0 }}/>
                   {syncing ? "Bezig..." : lastSync ? "Gesynchroniseerd" : "Gedeeld"}
                 </button>
-                <button onClick={forcePush} title="Mijn data pushen naar cloud" style={{ display:"flex", alignItems:"center", gap:".25rem", fontSize:".72rem", color:"var(--text3)", background:"none", border:"1px solid var(--border)", cursor:"pointer", padding:"2px 7px", borderRadius:6, fontFamily:"inherit", WebkitTapHighlightColor:"transparent" }}>
-                  ↑ Push
-                </button>
                 <span className="badge" style={{ color:DIRK.color,    background:DIRK.light,    border:"1px solid "+DIRK.border    }}>D {Math.round(ratioD*100)}%</span>
                 <span className="badge" style={{ color:SHELLEY.color, background:SHELLEY.light, border:"1px solid "+SHELLEY.border }}>S {Math.round(ratioS*100)}%</span>
               </div>
