@@ -427,7 +427,7 @@ export default function App() {
   var [loaded, setLoaded]     = useState(false);
   var [memory, setMemory]     = useState({});  // learned desc->postId mappings
   var [reviewPopup, setReviewPopup] = useState(null);
-  var reviewShownRef = useRef(false);
+  var [reviewChecked, setReviewChecked] = useState({});
   var isPullDataRef = useRef(false);
   var lastLocalEditRef = useRef(0);
 
@@ -478,26 +478,14 @@ export default function App() {
     setLastSync(new Date());
   }
 
-  useEffect(function() {
-    if (!loaded || reviewShownRef.current) return;
-    var prevM = month === 0 ? 11 : month - 1;
-    var prevY = month === 0 ? year - 1 : year;
-    var prevMD = data.months[prevY + "-" + prevM];
-    if (!prevMD) return;
-    var prevPosts = prevMD.posts || [];
-    var prevActuals = prevMD.actuals || {};
-    var diffs = prevPosts.filter(function(p) {
-      var a = prevActuals[p.id];
-      return (a !== null && a !== undefined) && Math.abs(a - (p.planned || 0)) >= 10;
-    }).map(function(p) {
-      var a = prevActuals[p.id];
-      return { id:p.id, label:p.label, planned:p.planned||0, actual:a, diff:a-(p.planned||0) };
-    }).sort(function(a,b){ return Math.abs(b.diff)-Math.abs(a.diff); });
-    if (diffs.length > 0) {
-      reviewShownRef.current = true;
-      setReviewPopup({ month: MONTHS[prevM], year: prevY, diffs: diffs });
-    }
-  }, [loaded]);
+  async function forcePush() {
+    setSyncing(true);
+    await saveShared(data);
+    setSyncing(false);
+    setLastSync(new Date());
+    notify("Data gepushed naar cloud ✓");
+  }
+
 
   function setData(fn) { lastLocalEditRef.current = Date.now(); setDataRaw(function(d){ return typeof fn === "function" ? fn(d) : fn; }); }
   function notify(msg) { setNotif(msg); setTimeout(function(){ setNotif(""); }, 2500); }
@@ -533,7 +521,20 @@ export default function App() {
   }
   function closeCurrentMonth() {
     saveMonthData(Object.assign({}, monthData, { closed: true }));
+    var diffs = posts.filter(function(p) {
+      var a = actuals[p.id];
+      return (a !== null && a !== undefined) && Math.abs(a - (p.planned || 0)) >= 10;
+    }).map(function(p) {
+      var a = actuals[p.id];
+      return { id:p.id, label:p.label, planned:p.planned||0, actual:a, diff:a-(p.planned||0) };
+    }).sort(function(a,b){ return Math.abs(b.diff)-Math.abs(a.diff); });
     notify("Maand afgesloten");
+    if (diffs.length > 0) {
+      var initChecked = {};
+      diffs.forEach(function(d){ initChecked[d.id] = true; });
+      setReviewChecked(initChecked);
+      setReviewPopup({ month: MONTHS[month], year: year, monthIdx: month, diffs: diffs });
+    }
   }
   function setPosts(fn) {
     saveMonthData(Object.assign({}, monthData, { posts: typeof fn === "function" ? fn(posts) : fn }));
@@ -794,33 +795,60 @@ export default function App() {
 
         {reviewPopup && (
           <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.45)", zIndex:9998, display:"flex", alignItems:"center", justifyContent:"center", padding:"1rem" }}>
-            <div style={{ background:"var(--surface)", borderRadius:"var(--radius)", boxShadow:"var(--shadow-md)", maxWidth:480, width:"100%", maxHeight:"80vh", overflowY:"auto", padding:"1.5rem" }}>
+            <div style={{ background:"var(--surface)", borderRadius:"var(--radius)", boxShadow:"var(--shadow-md)", maxWidth:500, width:"100%", maxHeight:"85vh", overflowY:"auto", padding:"1.5rem" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"1rem" }}>
                 <div>
                   <h2 style={{ fontFamily:"Fraunces,serif", fontSize:"1.1rem", fontWeight:600, marginBottom:".3rem" }}>Terugblik {reviewPopup.month}</h2>
-                  <p style={{ fontSize:".8rem", color:"var(--text2)", lineHeight:1.4 }}>Deze posten weken vorige maand af van het plan. Wil je het budget bijstellen voor deze maand?</p>
+                  <p style={{ fontSize:".8rem", color:"var(--text2)", lineHeight:1.4 }}>Vink aan welke budgetten je wil bijstellen voor volgende maand.</p>
                 </div>
                 <button onClick={function(){ setReviewPopup(null); }} style={{ background:"none", border:"none", cursor:"pointer", fontSize:"1rem", color:"var(--text3)", padding:"0 0 0 .75rem", flexShrink:0 }}>✕</button>
               </div>
               <div style={{ border:"1px solid var(--border)", borderRadius:"var(--radius-sm)", overflow:"hidden", marginBottom:"1.25rem" }}>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 70px 70px 70px", background:"var(--surface2)", padding:".4rem .75rem", borderBottom:"1px solid var(--border)" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"28px 1fr 70px 70px 70px", background:"var(--surface2)", padding:".4rem .75rem", borderBottom:"1px solid var(--border)" }}>
+                  <span/>
                   {["Post","Gepland","Werkelijk","Verschil"].map(function(h,i){ return <span key={h} style={{ fontSize:".62rem", fontWeight:600, letterSpacing:".08em", color:"var(--text3)", textAlign:i===0?"left":"right" }}>{h.toUpperCase()}</span>; })}
                 </div>
                 {reviewPopup.diffs.map(function(d) {
                   var over = d.diff > 0;
+                  var checked = !!reviewChecked[d.id];
                   return (
-                    <div key={d.id} style={{ display:"grid", gridTemplateColumns:"1fr 70px 70px 70px", padding:".5rem .75rem", borderBottom:"1px solid var(--border)", alignItems:"center" }}>
+                    <label key={d.id} style={{ display:"grid", gridTemplateColumns:"28px 1fr 70px 70px 70px", padding:".5rem .75rem", borderBottom:"1px solid var(--border)", alignItems:"center", cursor:"pointer", background: checked ? "var(--dirk-l)" : "transparent" }}>
+                      <input type="checkbox" checked={checked} onChange={function(){ setReviewChecked(function(c){ return Object.assign({},c,{[d.id]:!c[d.id]}); }); }} style={{ width:15, height:15, accentColor:"var(--dirk)", cursor:"pointer" }}/>
                       <span style={{ fontSize:".83rem" }}>{d.label}</span>
                       <span style={{ fontSize:".79rem", color:"var(--text2)", textAlign:"right" }}>{fmt(d.planned)}</span>
                       <span style={{ fontSize:".79rem", textAlign:"right" }}>{fmt(d.actual)}</span>
                       <span style={{ fontSize:".79rem", fontWeight:600, textAlign:"right", color: over ? "var(--red)" : "var(--green)" }}>{over ? "+" : ""}{fmt(d.diff)}</span>
-                    </div>
+                    </label>
                   );
                 })}
               </div>
               <div style={{ display:"flex", gap:".6rem" }}>
-                <button style={ghostBtn} onClick={function(){ setReviewPopup(null); }}>Nu niet</button>
-                <button style={Object.assign({},primaryBtn,{flex:1})} onClick={function(){ setReviewPopup(null); setTab("plan"); }}>Maandplan aanpassen</button>
+                <button style={ghostBtn} onClick={function(){ setReviewPopup(null); }}>Overslaan</button>
+                <button style={Object.assign({},primaryBtn,{flex:1})} onClick={function() {
+                  var nextM = reviewPopup.monthIdx === 11 ? 0 : reviewPopup.monthIdx + 1;
+                  var nextY = reviewPopup.monthIdx === 11 ? reviewPopup.year + 1 : reviewPopup.year;
+                  var nextMk = nextY + "-" + nextM;
+                  setData(function(d) {
+                    var curMD = d.months[reviewPopup.year + "-" + reviewPopup.monthIdx];
+                    var basePosts = curMD ? (curMD.posts||[]) : [];
+                    var existing = d.months[nextMk];
+                    var existPosts = existing ? (existing.posts||[]) : basePosts.map(function(p){ return Object.assign({},p); });
+                    var updatedPosts = existPosts.map(function(p) {
+                      if (reviewChecked[p.id]) {
+                        var diff = reviewPopup.diffs.find(function(dx){ return dx.id === p.id; });
+                        if (diff) return Object.assign({},p,{planned:diff.actual});
+                      }
+                      return p;
+                    });
+                    var ms = Object.assign({}, d.months);
+                    ms[nextMk] = Object.assign({}, existing||{actuals:{}}, {posts:updatedPosts});
+                    return Object.assign({}, d, {months:ms});
+                  });
+                  setReviewPopup(null);
+                  setTab("plan");
+                  setMonth(nextM);
+                  notify("Budget bijgesteld voor " + MONTHS[nextM]);
+                }}>Aanpassen &amp; volgende maand</button>
               </div>
             </div>
           </div>
@@ -836,9 +864,9 @@ export default function App() {
                 <span style={{ fontFamily:"Fraunces,serif", fontStyle:"italic", fontWeight:300, fontSize:".95rem", color:"var(--text2)" }}>Dirk &amp; Shelley</span>
               </div>
               <div style={{ display:"flex", alignItems:"center", gap:".75rem" }}>
-                <button onClick={manualSync} title="Nu synchroniseren" style={{ display:"flex", alignItems:"center", gap:".4rem", fontSize:".75rem", color:"var(--text3)", background:"none", border:"none", cursor:"pointer", padding:"2px 4px", borderRadius:6, fontFamily:"inherit", WebkitTapHighlightColor:"transparent" }}>
+                <button onClick={manualSync} title="Ophalen uit cloud" style={{ display:"flex", alignItems:"center", gap:".4rem", fontSize:".75rem", color:"var(--text3)", background:"none", border:"none", cursor:"pointer", padding:"2px 4px", borderRadius:6, fontFamily:"inherit", WebkitTapHighlightColor:"transparent" }}>
                   <div style={{ width:8, height:8, borderRadius:"50%", background: syncing ? "var(--orange)" : "var(--green)", flexShrink:0 }}/>
-                  {syncing ? "Opslaan..." : lastSync ? "Gesynchroniseerd" : "Gedeeld"}
+                  {syncing ? "Bezig..." : lastSync ? "Gesynchroniseerd" : "Gedeeld"}
                 </button>
                 <span className="badge" style={{ color:DIRK.color,    background:DIRK.light,    border:"1px solid "+DIRK.border    }}>D {Math.round(ratioD*100)}%</span>
                 <span className="badge" style={{ color:SHELLEY.color, background:SHELLEY.light, border:"1px solid "+SHELLEY.border }}>S {Math.round(ratioS*100)}%</span>
@@ -1376,29 +1404,42 @@ export default function App() {
               })}
 
               <Card className="card-pad" style={{ padding:"1rem 1.1rem" }}>
-                <div className="check-row" style={{ padding:".35rem .4rem", marginBottom:".35rem" }}>
+                <div className="check-row" style={{ padding:".35rem .4rem", marginBottom:".5rem" }}>
                   <span style={{ fontWeight:600, fontSize:".88rem" }}>Sparen &amp; Beleggen</span>
                   <span style={{ textAlign:"right", fontSize:".84rem", color:"var(--text2)", fontWeight:500 }}>{fmt(totSpaar)}</span>
                   <span style={{ textAlign:"right", fontSize:".84rem", fontWeight:600 }}>{fmt(totSpaarAct)}</span>
                   <div style={{ display:"flex", justifyContent:"flex-end" }}><DiffBadge planned={totSpaar} actual={totSpaarAct}/></div>
                 </div>
-                <div style={{ borderTop:"1px solid var(--border)", marginBottom:".35rem" }}/>
-                {spaarMonth.map(function(p) {
-                  var u = USERS.find(function(u){ return u.id===p.owner; });
-                  return (
-                    <div key={p.id} className="row-hover" className="check-row row-hover" style={{ padding:".3rem .4rem" }}>
-                      <div style={{ display:"flex", alignItems:"center", gap:".4rem" }}>
-                        <span style={{ fontSize:".82rem", color:"var(--text2)" }}>{p.label}</span>
-                        {u && <span className="pill" style={{ color:u.color, background:u.light, border:"1px solid "+u.border }}>{u.name[0]}</span>}
-                      </div>
-                      <span style={{ textAlign:"right", fontSize:".8rem", color:"var(--text3)" }}>{fmt(p.planned)}</span>
-                      <div style={{ display:"flex", justifyContent:"flex-end" }}>
-                        <DecInput value={p.actual} onCommit={function(v){ updateSpaar(p.id,"actual",v); }} placeholder={String((p.planned||0).toFixed(0))} style={inpRight}/>
-                      </div>
-                      <div className="diff-col" style={{ display:"flex", justifyContent:"flex-end" }}><DiffBadge planned={p.planned} actual={p.actual}/></div>
-                    </div>
-                  );
-                })}
+                <button
+                  onClick={function() {
+                    saveSpaar(spaarMonth.map(function(p){ return Object.assign({},p,{actual:p.planned}); }));
+                    notify("Alles gespaard!");
+                  }}
+                  style={{ width:"100%", padding:".55rem", borderRadius:"var(--radius-sm)", border:"1px solid #bbf7d0", background:"var(--green-l)", color:"#16a34a", fontWeight:600, fontSize:".85rem", cursor:"pointer", fontFamily:"inherit", marginBottom:".6rem" }}
+                >
+                  ✓ Alles gespaard
+                </button>
+                <details>
+                  <summary style={{ fontSize:".78rem", color:"var(--text3)", cursor:"pointer", userSelect:"none", marginBottom:".35rem" }}>Uitzonderingen invoeren</summary>
+                  <div style={{ borderTop:"1px solid var(--border)", marginTop:".35rem", paddingTop:".35rem" }}>
+                    {spaarMonth.map(function(p) {
+                      var u = USERS.find(function(u){ return u.id===p.owner; });
+                      return (
+                        <div key={p.id} className="check-row row-hover" style={{ padding:".3rem .4rem" }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:".4rem" }}>
+                            <span style={{ fontSize:".82rem", color:"var(--text2)" }}>{p.label}</span>
+                            {u && <span className="pill" style={{ color:u.color, background:u.light, border:"1px solid "+u.border }}>{u.name[0]}</span>}
+                          </div>
+                          <span style={{ textAlign:"right", fontSize:".8rem", color:"var(--text3)" }}>{fmt(p.planned)}</span>
+                          <div style={{ display:"flex", justifyContent:"flex-end" }}>
+                            <DecInput value={p.actual} onCommit={function(v){ updateSpaar(p.id,"actual",v); }} placeholder={String((p.planned||0).toFixed(0))} style={inpRight}/>
+                          </div>
+                          <div className="diff-col" style={{ display:"flex", justifyContent:"flex-end" }}><DiffBadge planned={p.planned} actual={p.actual}/></div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </details>
               </Card>
 
               <Card style={{ background:"var(--text)", border:"none", padding:"1rem 1.25rem" }}>
