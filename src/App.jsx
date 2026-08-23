@@ -428,6 +428,7 @@ export default function App() {
   var [memory, setMemory]     = useState({});  // learned desc->postId mappings
   var [reviewPopup, setReviewPopup] = useState(null);
   var [reviewChecked, setReviewChecked] = useState({});
+  var [expandedPosts, setExpandedPosts] = useState({});
   var isPullDataRef = useRef(false);
   var lastLocalEditRef = useRef(0);
 
@@ -683,7 +684,7 @@ export default function App() {
       // Fall back to keyword matching
       return Object.assign({}, r, { include:true, assignedId:kwMatch(r.desc, posts) });
     });
-    setImportRows(function(prev){ return [...result, ...prev.filter(function(r){ return r._fromTriage; })]; });
+    setImportRows(function(prev){ return [...result, ...prev.filter(function(r){ return r._fromTriage || r._fromMemory; })]; });
     setImportStep("preview");
     setAiMsg(fromMemory > 0 ? fromMemory + " herkend uit geheugen" : "");
   }
@@ -705,11 +706,27 @@ export default function App() {
         }
         var needsTriage = all.filter(function(r){ return TX_INFO[r.txClass] && TX_INFO[r.txClass].def === "vragen"; });
         var toCateg     = all.filter(function(r){ return TX_INFO[r.txClass] && TX_INFO[r.txClass].def === "categoriseren"; });
-        if (needsTriage.length > 0) {
-          setTriageRows(needsTriage.map(function(r){ return Object.assign({},r,{triageDecision:"overslaan",assignedId:"__onbekend__"}); }));
-          setImportRows(toCateg.map(function(r){ return Object.assign({},r,{include:true,assignedId:"__onbekend__"}); }));
+
+        var autoHandled = [];
+        var stillNeedTriage = [];
+        needsTriage.forEach(function(r) {
+          var k = memKey(r.desc);
+          var mem = memory[k];
+          if (mem === "__skip__") {
+            // silently skip
+          } else if (mem && posts.find(function(p){ return p.id === mem; })) {
+            autoHandled.push(Object.assign({}, r, { include:true, assignedId:mem, _fromMemory:true }));
+          } else {
+            stillNeedTriage.push(r);
+          }
+        });
+
+        if (stillNeedTriage.length > 0) {
+          setTriageRows(stillNeedTriage.map(function(r){ return Object.assign({},r,{triageDecision:"overslaan",assignedId:"__onbekend__"}); }));
+          setImportRows([...toCateg.map(function(r){ return Object.assign({},r,{include:true,assignedId:"__onbekend__"}); }), ...autoHandled]);
           setImportStep("triage");
         } else {
+          setImportRows(autoHandled);
           runAI(toCateg);
         }
       } catch(err) {
@@ -727,9 +744,22 @@ export default function App() {
   }
 
   function applyTriage() {
+    var newMem = Object.assign({}, memory);
+    var memChanged = false;
+    triageRows.forEach(function(r) {
+      var k = memKey(r.desc);
+      if (!k) return;
+      if (r.triageDecision === "overslaan" && newMem[k] !== "__skip__") {
+        newMem[k] = "__skip__"; memChanged = true;
+      } else if (r.triageDecision === "handmatig" && r.assignedId !== "__onbekend__" && newMem[k] !== r.assignedId) {
+        newMem[k] = r.assignedId; memChanged = true;
+      }
+    });
+    if (memChanged) { setMemory(newMem); saveMemory(newMem); }
+
     var toCat  = triageRows.filter(function(r){ return r.triageDecision === "categoriseren"; });
     var manual = triageRows.filter(function(r){ return r.triageDecision === "handmatig" && r.assignedId !== "__onbekend__"; }).map(function(r){ return Object.assign({},r,{include:true,_fromTriage:true}); });
-    var base   = [...importRows.filter(function(r){ return !r._fromTriage; }), ...toCat];
+    var base   = [...importRows.filter(function(r){ return !r._fromTriage && !r._fromMemory; }), ...toCat];
     setImportRows([...base, ...manual]);
     if (base.length > 0) { runAI(base); }
     else { setImportStep("preview"); }
@@ -1308,50 +1338,60 @@ export default function App() {
                   <div>
                     <div style={{ fontSize:".84rem", fontWeight:500, marginBottom:".75rem" }}>{importRows.filter(function(r){ return r.include!==false; }).length} transacties herkend</div>
                     <div style={{ border:"1px solid var(--border)", borderRadius:"var(--radius-sm)", overflow:"hidden", marginBottom:".85rem" }}>
-                      <div style={{ display:"grid", gridTemplateColumns:"1fr 90px 90px", background:"var(--surface2)", padding:".5rem .85rem", borderBottom:"1px solid var(--border)" }}>
-                        {["Post","Gepland","Werkelijk"].map(function(h){ return <span key={h} style={colHead}>{h.toUpperCase()}</span>; })}
-                      </div>
-                      {Object.entries(importSummary).map(function(pair) {
+                      {Object.entries(importSummary).concat(
+                        importRows.filter(function(r){ return r.include===false; }).reduce(function(acc, r) {
+                          if (!importSummary[r.assignedId] && !acc.find(function(x){ return x[0]===r.assignedId; })) acc.push([r.assignedId, 0]);
+                          return acc;
+                        }, [])
+                      ).map(function(pair) {
                         var pid=pair[0], total=pair[1];
                         var post = posts.find(function(p){ return p.id===pid; });
                         var over = post && total > post.planned;
+                        var txForPost = importRows.filter(function(r){ return r.assignedId===pid; });
+                        var isOpen = !!expandedPosts[pid];
                         return (
-                          <div key={pid} style={{ display:"grid", gridTemplateColumns:"1fr 90px 90px", padding:".5rem .85rem", borderBottom:"1px solid var(--border)", alignItems:"center" }}>
-                            <span style={{ fontSize:".84rem" }}>{post ? post.label : pid}</span>
-                            <span style={{ fontSize:".82rem", color:"var(--text2)" }}>{post ? fmt(post.planned) : "-"}</span>
-                            <div style={{ display:"flex", alignItems:"center", gap:.4 }}>
-                              <span style={{ fontSize:".82rem", fontWeight:500, color: over ? "var(--red)" : "var(--text)" }}>{fmt(total)}</span>
-                              {over && <span className="badge" style={{ color:"var(--red)", background:"var(--red-l)", border:"1px solid #fecaca" }}>OVER</span>}
+                          <div key={pid} style={{ borderBottom:"1px solid var(--border)" }}>
+                            <div onClick={function(){ setExpandedPosts(function(ep){ return Object.assign({},ep,{[pid]:!ep[pid]}); }); }}
+                              style={{ display:"grid", gridTemplateColumns:"20px 1fr 80px 90px", padding:".5rem .85rem", alignItems:"center", cursor:"pointer", background: isOpen ? "var(--dirk-l)" : "var(--surface)" }}
+                              onMouseEnter={function(e){ if(!isOpen) e.currentTarget.style.background="var(--surface2)"; }}
+                              onMouseLeave={function(e){ if(!isOpen) e.currentTarget.style.background="var(--surface)"; }}>
+                              <span style={{ fontSize:".65rem", color:"var(--text3)" }}>{isOpen ? "▾" : "▸"}</span>
+                              <span style={{ fontSize:".84rem", fontWeight:500 }}>{post ? post.label : pid}</span>
+                              <span style={{ fontSize:".78rem", color:"var(--text3)", textAlign:"right" }}>{post ? fmt(post.planned) : "-"}</span>
+                              <div style={{ display:"flex", alignItems:"center", gap:4, justifyContent:"flex-end" }}>
+                                <span style={{ fontSize:".82rem", fontWeight:600, color: over ? "var(--red)" : "var(--text)" }}>{fmt(total)}</span>
+                                {over && <span className="badge" style={{ color:"var(--red)", background:"var(--red-l)", border:"1px solid #fecaca" }}>OVER</span>}
+                              </div>
                             </div>
+                            {isOpen && (
+                              <div style={{ background:"var(--surface2)", borderTop:"1px solid var(--border)" }}>
+                                {txForPost.map(function(r) {
+                                  var globalIdx = importRows.findIndex(function(x){ return x.id===r.id; });
+                                  return (
+                                    <div key={r.id} style={{ display:"flex", alignItems:"center", gap:".5rem", padding:".4rem .85rem .4rem 2.2rem", borderBottom:"1px solid var(--border)", opacity: r.include===false ? .45 : 1 }}>
+                                      <input type="checkbox" checked={r.include!==false} onChange={function(e){ var v=e.target.checked; setImportRows(function(rs){ return rs.map(function(x,j){ return j===globalIdx?Object.assign({},x,{include:v}):x; }); }); }} style={{ accentColor:"var(--dirk)", flexShrink:0 }}/>
+                                      <div style={{ flex:1, minWidth:0 }}>
+                                        <div style={{ fontSize:".77rem", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                                          {r.desc}
+                                          {r._fromMemory && <span className="badge" style={{ marginLeft:4, color:"var(--green)", background:"var(--green-l)", border:"1px solid #bbf7d0", fontSize:".6rem" }}>geleerd</span>}
+                                        </div>
+                                        <div style={{ fontSize:".65rem", color:"var(--text3)" }}>{r.date}</div>
+                                      </div>
+                                      <select value={r.assignedId} onChange={function(e){ var v=e.target.value; setImportRows(function(rs){ return rs.map(function(x,j){ return j===globalIdx?Object.assign({},x,{assignedId:v}):x; }); }); }}
+                                        style={{ border:"1px solid var(--border2)", borderRadius:6, padding:".25rem .35rem", fontSize:".7rem", fontFamily:"inherit", background:"var(--surface)", maxWidth:120 }}>
+                                        {posts.map(function(p){ return <option key={p.id} value={p.id}>{p.label}</option>; })}
+                                        <option value="__onbekend__">Niet toewijzen</option>
+                                      </select>
+                                      <span style={{ color:"var(--red)", fontSize:".78rem", fontWeight:500, flexShrink:0 }}>-{fmt(r.amount)}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
                     </div>
-                    <details style={{ marginBottom:".85rem" }}>
-                      <summary style={{ fontSize:".78rem", color:"var(--text2)", cursor:"pointer", padding:".3rem 0", fontWeight:500 }}>Bekijk &amp; corrigeer alle {importRows.length} transacties</summary>
-                      <div style={{ maxHeight:240, overflowY:"auto", marginTop:".5rem", border:"1px solid var(--border)", borderRadius:"var(--radius-sm)" }}>
-                        {importRows.map(function(r,i) {
-                          return (
-                            <div key={i} style={{ display:"flex", alignItems:"center", gap:".5rem", padding:".4rem .75rem", borderBottom:"1px solid var(--border)", opacity: r.include===false ? .4 : 1 }}>
-                              <input type="checkbox" checked={r.include!==false} onChange={function(e){ var v=e.target.checked; setImportRows(function(rs){ return rs.map(function(x,j){ return j===i?Object.assign({},x,{include:v}):x; }); }); }} style={{ accentColor:"var(--dirk)", flexShrink:0 }}/>
-                              <div style={{ flex:1, minWidth:0 }}>
-                                <div style={{ fontSize:".79rem", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                                {r.desc}
-                                {r._fromMemory && <span className="badge" style={{ marginLeft:4, color:"var(--green)", background:"var(--green-l)", border:"1px solid #bbf7d0", fontSize:".6rem" }}>geleerd</span>}
-                              </div>
-                              <div style={{ fontSize:".67rem", color:"var(--text3)" }}>{r.date}</div>
-                              </div>
-                              <select value={r.assignedId} onChange={function(e){ var v=e.target.value; setImportRows(function(rs){ return rs.map(function(x,j){ return j===i?Object.assign({},x,{assignedId:v}):x; }); }); }}
-                                style={{ border:"1px solid var(--border2)", borderRadius:6, padding:".25rem .35rem", fontSize:".72rem", fontFamily:"inherit", background:"var(--surface)", maxWidth:130 }}>
-                                {posts.map(function(p){ return <option key={p.id} value={p.id}>{p.label}</option>; })}
-                                <option value="__onbekend__">Niet toewijzen</option>
-                              </select>
-                              <span style={{ color:"var(--red)", fontSize:".8rem", fontWeight:500, flexShrink:0 }}>-{fmt(r.amount)}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </details>
                     <div style={{ display:"flex", gap:".6rem" }}>
                       <button style={ghostBtn} onClick={resetImport}>Annuleren</button>
                       <button style={Object.assign({},primaryBtn,{flex:1})} onClick={applyImport}>Verwerk {importRows.filter(function(r){ return r.include!==false; }).length} transacties</button>
