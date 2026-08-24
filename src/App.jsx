@@ -30,7 +30,11 @@ const USERS   = [DIRK, SHELLEY];
 const MONTHS  = ["Januari","Februari","Maart","April","Mei","Juni","Juli","Augustus","September","Oktober","November","December"];
 const MONTHS_S = ["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","Nov","Dec"];
 
-function fmt(n) { return new Intl.NumberFormat("nl-NL",{style:"currency",currency:"EUR"}).format(n||0); }
+var _privacy = { mode: false };
+function fmt(n) {
+  if (_privacy.mode) return "•••";
+  return new Intl.NumberFormat("nl-NL",{style:"currency",currency:"EUR"}).format(n||0);
+}
 function newId() { return Math.random().toString(36).slice(2,9); }
 
 // Defaults
@@ -320,7 +324,7 @@ function DiffBadge({ planned, actual, invert }) {
   var bad = invert ? d < 0 : d > 0;
   return (
     <span className="badge" style={{ color: bad ? "var(--red)" : "var(--green)", background: bad ? "var(--red-l)" : "var(--green-l)", border: "1px solid " + (bad ? "#fecaca" : "#bbf7d0") }}>
-      {d > 0 ? "+" : "-"}{fmt(Math.abs(d))}
+      {_privacy.mode ? "•••" : (d > 0 ? "+" : "-")+fmt(Math.abs(d))}
     </span>
   );
 }
@@ -421,6 +425,7 @@ export default function App() {
   var [year]              = useState(now.getFullYear());
   var [tab,   setTab]     = useState("plan");
   var [notif, setNotif]   = useState("");
+  var [privacyMode, setPrivacyMode] = useState(false);
   var [syncing, setSyncing]   = useState(false);
   var [lastSync, setLastSync] = useState(null);
   var [data, setDataRaw]      = useState(DEFAULT_DATA);
@@ -470,6 +475,8 @@ export default function App() {
     window.addEventListener('focus', pull);
     return function(){ clearInterval(iv); document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('focus', pull); };
   }, [loaded]);
+
+  useEffect(function() { _privacy.mode = privacyMode; }, [privacyMode]);
 
   async function manualSync() {
     setSyncing(true);
@@ -916,6 +923,9 @@ export default function App() {
                 <span style={{ fontFamily:"Fraunces,serif", fontStyle:"italic", fontWeight:300, fontSize:".95rem", color:"var(--text2)" }}>Dirk &amp; Shelley</span>
               </div>
               <div style={{ display:"flex", alignItems:"center", gap:".75rem" }}>
+                <button onClick={function(){ setPrivacyMode(function(p){ return !p; }); }} title={privacyMode ? "Bedragen tonen" : "Bedragen verbergen"} style={{ fontSize:".75rem", color: privacyMode ? "var(--dirk)" : "var(--text3)", background: privacyMode ? "var(--dirk-l)" : "none", border: privacyMode ? "1px solid var(--dirk-b)" : "1px solid var(--border)", cursor:"pointer", padding:"2px 8px", borderRadius:6, fontFamily:"inherit", WebkitTapHighlightColor:"transparent", fontWeight: privacyMode ? 600 : 400 }}>
+                  {privacyMode ? "Verborgen" : "Verbergen"}
+                </button>
                 <button onClick={manualSync} title="Ophalen uit cloud" style={{ display:"flex", alignItems:"center", gap:".4rem", fontSize:".75rem", color:"var(--text3)", background:"none", border:"none", cursor:"pointer", padding:"2px 4px", borderRadius:6, fontFamily:"inherit", WebkitTapHighlightColor:"transparent" }}>
                   <div style={{ width:8, height:8, borderRadius:"50%", background: syncing ? "var(--orange)" : "var(--green)", flexShrink:0 }}/>
                   {syncing ? "Bezig..." : lastSync ? "Gesynchroniseerd" : "Gedeeld"}
@@ -1571,7 +1581,7 @@ export default function App() {
                       <span style={{ textAlign:"right", fontSize:".95rem", fontWeight:700, color:"white" }}>{fmt(allAct)}</span>
                       <div style={{ display:"flex", justifyContent:"flex-end" }}>
                         <span className="badge" style={{ color: pos?"#fca5a5":"#86efac", background: pos?"rgba(239,68,68,.2)":"rgba(34,197,94,.2)", border: "1px solid "+(pos?"rgba(239,68,68,.3)":"rgba(34,197,94,.3)"), fontSize:".8rem", fontWeight:700 }}>
-                          {Math.abs(diff)<0.01 ? "ok" : (pos?"+":"-")+fmt(Math.abs(diff))}
+                          {Math.abs(diff)<0.01 ? "ok" : _privacy.mode ? "•••" : (pos?"+":"-")+fmt(Math.abs(diff))}
                         </span>
                       </div>
                     </div>
