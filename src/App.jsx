@@ -311,16 +311,16 @@ function Card({ children, style }) {
 function Sec({ children }) {
   return <div style={{ fontSize:".65rem", fontWeight:600, letterSpacing:".1em", color:"var(--text3)", textTransform:"uppercase", marginBottom:".85rem" }}>{children}</div>;
 }
-function DiffBadge({ planned, actual }) {
+function DiffBadge({ planned, actual, invert }) {
   if (actual === null || actual === undefined) {
     return <span style={{ color:"var(--text3)", fontSize:".8rem" }}>-</span>;
   }
   var d = actual - planned;
   if (Math.abs(d) < 0.01) return <span style={{ color:"var(--text3)", fontSize:".8rem" }}>ok</span>;
-  var pos = d > 0;
+  var bad = invert ? d < 0 : d > 0;
   return (
-    <span className="badge" style={{ color: pos ? "var(--red)" : "var(--green)", background: pos ? "var(--red-l)" : "var(--green-l)", border: "1px solid " + (pos ? "#fecaca" : "#bbf7d0") }}>
-      {pos ? "+" : "-"}{fmt(Math.abs(d))}
+    <span className="badge" style={{ color: bad ? "var(--red)" : "var(--green)", background: bad ? "var(--red-l)" : "var(--green-l)", border: "1px solid " + (bad ? "#fecaca" : "#bbf7d0") }}>
+      {d > 0 ? "+" : "-"}{fmt(Math.abs(d))}
     </span>
   );
 }
@@ -1554,14 +1554,14 @@ export default function App() {
                       style={inpRight}
                     />
                   </div>
-                  <div className="diff-col" style={{ display:"flex", justifyContent:"flex-end" }}><DiffBadge planned={totSpaarOnly} actual={monthData.spaarActueel != null ? monthData.spaarActueel : null}/></div>
+                  <div className="diff-col" style={{ display:"flex", justifyContent:"flex-end" }}><DiffBadge planned={totSpaarOnly} actual={monthData.spaarActueel != null ? monthData.spaarActueel : null} invert/></div>
                 </div>
               </Card>
 
               <Card style={{ background:"var(--text)", border:"none", padding:"1rem 1.25rem" }}>
                 {(function() {
-                  var allPlan = posts.reduce(function(s,p){ return s+(p.planned||0); }, 0) + totSpaar;
-                  var allAct  = posts.reduce(function(s,p){ var a=actuals[p.id]; return s+(a!==null&&a!==undefined?a:p.planned||0); }, 0) + totSpaarAct;
+                  var allPlan = posts.reduce(function(s,p){ return s+(p.planned||0); }, 0);
+                  var allAct  = posts.reduce(function(s,p){ var a=actuals[p.id]; return s+(a!==null&&a!==undefined?a:p.planned||0); }, 0);
                   var diff    = allAct - allPlan;
                   var pos     = diff > 0;
                   return (
