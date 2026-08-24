@@ -703,12 +703,9 @@ export default function App() {
     reader.onload = function(ev) {
       try {
         var text = ev.target.result;
-        var all  = parseRabobank(text).filter(function(r) {
-          var d = new Date(r.date);
-          return d.getMonth() === month && d.getFullYear() === year;
-        });
+        var all  = parseRabobank(text);
         if (!all.length) {
-          setCsvError("Geen uitgaven gevonden voor " + MONTHS[month] + " " + year + ". Selecteer de juiste maand bovenaan.");
+          setCsvError("Geen uitgaven gevonden in dit bestand. Controleer of het een Rabobank CSV is.");
           setImportStep("idle"); return;
         }
         var needsTriage = all.filter(function(r){ return TX_INFO[r.txClass] && TX_INFO[r.txClass].def === "vragen"; });
