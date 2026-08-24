@@ -80,15 +80,16 @@ const DEFAULT_POSTS = [
 ];
 
 const DEFAULT_SPAAR = [
-  { id:"sp_d1", owner:"dirk",    label:"Spaarrekening",   planned:150, type:"eigen"    },
-  { id:"sp_d2", owner:"dirk",    label:"Vakantie",        planned:75,  type:"sparen"   },
-  { id:"sp_d3", owner:"dirk",    label:"Buffer",          planned:75,  type:"sparen"   },
-  { id:"sp_d4", owner:"dirk",    label:"Maeve potje",     planned:75,  type:"sparen"   },
-  { id:"sp_d5", owner:"dirk",    label:"Beleggen",        planned:250, type:"beleggen" },
-  { id:"sp_d6", owner:"dirk",    label:"Crypto",          planned:25,  type:"beleggen" },
-  { id:"sp_s1", owner:"shelley", label:"Spaarrekening",   planned:50,  type:"eigen"    },
-  { id:"sp_s2", owner:"shelley", label:"Maeve spaarrek.", planned:25,  type:"sparen"   },
-  { id:"sp_s3", owner:"shelley", label:"By Bae",          planned:50,  type:"sparen"   },
+  { id:"sp_d1", owner:"dirk",    label:"Spaarrekening",   planned:150, type:"eigen"         },
+  { id:"sp_d2", owner:"dirk",    label:"Vakantie",        planned:75,  type:"sparen"        },
+  { id:"sp_d3", owner:"dirk",    label:"Buffer",          planned:75,  type:"sparen"        },
+  { id:"sp_d4", owner:"dirk",    label:"Maeve potje",     planned:75,  type:"sparen"        },
+  { id:"sp_d5", owner:"dirk",    label:"Beleggen",        planned:250, type:"beleggen"      },
+  { id:"sp_d6", owner:"dirk",    label:"Crypto",          planned:25,  type:"beleggen"      },
+  { id:"sp_s1", owner:"shelley", label:"Spaarrekening",   planned:50,  type:"eigen"         },
+  { id:"sp_s2", owner:"shelley", label:"Maeve spaarrek.", planned:25,  type:"sparen"        },
+  { id:"sp_s3", owner:"shelley", label:"By Bae",          planned:50,  type:"sparen"        },
+  { id:"sp_k1", owner:"samen",   label:"Kinderopvang",    planned:0,   type:"kinderopvang"  },
 ];
 
 const DEFAULT_DATA = {
@@ -295,7 +296,7 @@ var CSS_STR = [
   ".check-row{display:grid;grid-template-columns:1fr 80px 88px 72px;gap:0 .4rem;align-items:center;}",
   ".check-head{display:grid;grid-template-columns:1fr 80px 88px 72px;gap:0 .4rem;}",
   ".post-row{display:grid;grid-template-columns:1fr 88px 40px;gap:.5rem;align-items:center;}",
-  ".spaar-row{display:grid;grid-template-columns:1fr 68px 80px 82px 36px;gap:.5rem;align-items:center;}",
+  ".spaar-row{display:grid;grid-template-columns:1fr 68px 80px 36px;gap:.5rem;align-items:center;}",
   "@media(max-width:640px){",
   "  .kpi-grid{grid-template-columns:repeat(2,1fr);}",
   "  .kpi-5{grid-column:1/-1;}",
@@ -304,7 +305,7 @@ var CSS_STR = [
   "  .check-head{grid-template-columns:1fr 76px 82px;}",
   "  .diff-col{display:none;}",
   "  .post-row{grid-template-columns:1fr 80px 40px;}",
-  "  .spaar-row{grid-template-columns:1fr 56px 72px 74px 32px;}",
+  "  .spaar-row{grid-template-columns:1fr 56px 72px 32px;}",
   "  .tab-btn{padding:.55rem .7rem;font-size:.78rem;}",
   "  .header-inner{flex-direction:column;align-items:flex-start;gap:.5rem;}",
   "  .card-pad{padding:.9rem;}",
@@ -440,8 +441,10 @@ export default function App() {
   var [reviewPopup, setReviewPopup] = useState(null);
   var [reviewChecked, setReviewChecked] = useState({});
   var [expandedPosts, setExpandedPosts] = useState({});
-  var [dragPostId,   setDragPostId]   = useState(null);
-  var [dragOverId,   setDragOverId]   = useState(null);
+  var [dragPostId,    setDragPostId]    = useState(null);
+  var [dragOverId,    setDragOverId]    = useState(null);
+  var [dragSpaarId,   setDragSpaarId]   = useState(null);
+  var [dragSpaarOver, setDragSpaarOver] = useState(null);
   var isPullDataRef = useRef(false);
   var lastLocalEditRef = useRef(0);
 
@@ -580,6 +583,21 @@ export default function App() {
   function handleDragStart(e, id) { setDragPostId(id); e.dataTransfer.effectAllowed = "move"; }
   function handleDragOver(e, id)  { e.preventDefault(); setDragOverId(id); }
   function handleDragEnd()        { setDragPostId(null); setDragOverId(null); }
+  function handleSpaarDragStart(e, id) { setDragSpaarId(id); e.dataTransfer.effectAllowed = "move"; }
+  function handleSpaarDragOver(e, id)  { e.preventDefault(); setDragSpaarOver(id); }
+  function handleSpaarDragEnd()        { setDragSpaarId(null); setDragSpaarOver(null); }
+  function handleSpaarDrop(e, targetId) {
+    e.preventDefault();
+    if (!dragSpaarId || dragSpaarId === targetId) { setDragSpaarId(null); setDragSpaarOver(null); return; }
+    var from = spaarMonth.findIndex(function(p){ return p.id === dragSpaarId; });
+    var to   = spaarMonth.findIndex(function(p){ return p.id === targetId; });
+    if (from < 0 || to < 0) { setDragSpaarId(null); setDragSpaarOver(null); return; }
+    var next = spaarMonth.slice();
+    next.splice(from, 1);
+    next.splice(to, 0, spaarMonth[from]);
+    saveSpaar(next);
+    setDragSpaarId(null); setDragSpaarOver(null);
+  }
   function handleDrop(e, targetId) {
     e.preventDefault();
     if (!dragPostId || dragPostId === targetId) { setDragPostId(null); setDragOverId(null); return; }
@@ -1137,43 +1155,33 @@ export default function App() {
                   {["Naam","Persoon","Bedrag","Sectie",""].map(function(h,i){ return <span key={i} style={Object.assign({},colHead,{textAlign:i===2?"right":"left"})}>{h.toUpperCase()}</span>; })}
                 </div>
                 {spaarMonth.filter(function(p){ return p.type === "sparen" || p.type === "kinderopvang"; }).map(function(p) {
-                  var u = USERS.find(function(u){ return u.id===p.owner; });
+                  var u = p.owner === "samen" ? null : USERS.find(function(u){ return u.id===p.owner; });
+                  var isOver = dragSpaarOver === p.id && dragSpaarId !== p.id;
                   return (
-                    <div key={p.id} className="spaar-row row-hover" style={{ padding:".3rem .25rem", marginBottom:".15rem" }}>
-                      <input value={p.label} onChange={function(e){ updateSpaar(p.id,"label",e.target.value); }} style={Object.assign({},inpFull,{border:"none",background:"transparent",fontSize:".85rem"})}/>
-                      <select value={p.owner} onChange={function(e){ updateSpaar(p.id,"owner",e.target.value); }}
-                        style={{ border:"1px solid var(--border2)", borderRadius:6, padding:".3rem .4rem", fontSize:".78rem", color: u ? u.color : "inherit", background: u ? u.light : "white", fontFamily:"inherit", outline:"none" }}>
-                        <option value="dirk">Dirk</option>
-                        <option value="shelley">Shelley</option>
-                      </select>
+                    <div key={p.id} className="spaar-row row-hover"
+                      draggable onDragStart={function(e){ handleSpaarDragStart(e,p.id); }} onDragOver={function(e){ handleSpaarDragOver(e,p.id); }} onDrop={function(e){ handleSpaarDrop(e,p.id); }} onDragEnd={handleSpaarDragEnd}
+                      style={{ padding:".3rem .25rem", marginBottom:".15rem", opacity: dragSpaarId===p.id?.4:1, borderTop: isOver?"2px solid var(--dirk)":"2px solid transparent", cursor:"grab" }}>
+                      <input value={p.label} onChange={function(e){ updateSpaar(p.id,"label",e.target.value); }} style={Object.assign({},inpFull,{border:"none",background:"transparent",fontSize:".85rem",cursor:"text"})}/>
+                      {p.owner === "samen"
+                        ? <span style={{ fontSize:".75rem", color:"var(--text3)", padding:".3rem 0" }}>Samen</span>
+                        : <select value={p.owner} onChange={function(e){ updateSpaar(p.id,"owner",e.target.value); }}
+                            style={{ border:"1px solid var(--border2)", borderRadius:6, padding:".3rem .4rem", fontSize:".78rem", color: u ? u.color : "inherit", background: u ? u.light : "white", fontFamily:"inherit", outline:"none" }}>
+                            <option value="dirk">Dirk</option>
+                            <option value="shelley">Shelley</option>
+                          </select>
+                      }
                       <NumInput value={p.planned||""} onChange={function(v){ updateSpaar(p.id,"planned",v); }} placeholder="0" accentColor={u ? u.color : undefined}/>
-                      <select value={p.type} onChange={function(e){ updateSpaar(p.id,"type",e.target.value); }}
-                        style={{ border:"1px solid var(--border2)", borderRadius:6, padding:".3rem .3rem", fontSize:".72rem", color:"var(--text2)", background:"var(--surface)", fontFamily:"inherit", outline:"none" }}>
-                        <option value="sparen">Sparen</option>
-                        <option value="kinderopvang">Kinderopvang</option>
-                        <option value="eigen">Eigen rek.</option>
-                        <option value="beleggen">Beleggen</option>
-                      </select>
                       <button style={delBtn} onClick={function(){ saveSpaar(spaarMonth.filter(function(x){ return x.id!==p.id; })); }}
                         onMouseEnter={function(e){ e.target.style.color="var(--red)"; e.target.style.background="var(--red-l)"; }}
                         onMouseLeave={function(e){ e.target.style.color="var(--text3)"; e.target.style.background="none"; }}>✕</button>
                     </div>
                   );
                 })}
-                <div style={{ display:"flex", gap:".5rem", flexWrap:"wrap" }}>
-                  <button style={addBtn} onClick={function(){ saveSpaar([...spaarMonth,{id:newId(),owner:"dirk",label:"Nieuw potje",planned:0,actual:null,type:"sparen"}]); }}
-                    onMouseEnter={function(e){ e.target.style.borderColor=DIRK.color; e.target.style.color=DIRK.color; }}
-                    onMouseLeave={function(e){ e.target.style.borderColor="var(--border2)"; e.target.style.color="var(--text3)"; }}>
-                    + Potje toevoegen
-                  </button>
-                  {!kinderopvangPost && (
-                    <button style={Object.assign({},addBtn,{borderColor:"#fbbf24",color:"#92400e"})} onClick={function(){ saveSpaar([...spaarMonth,{id:newId(),owner:"dirk",label:"Kinderopvang",planned:0,actual:null,type:"kinderopvang"}]); }}
-                      onMouseEnter={function(e){ e.target.style.borderColor="#f59e0b"; }}
-                      onMouseLeave={function(e){ e.target.style.borderColor="#fbbf24"; }}>
-                      + Kinderopvang
-                    </button>
-                  )}
-                </div>
+                <button style={addBtn} onClick={function(){ saveSpaar([...spaarMonth,{id:newId(),owner:"dirk",label:"Nieuw potje",planned:0,actual:null,type:"sparen"}]); }}
+                  onMouseEnter={function(e){ e.target.style.borderColor=DIRK.color; e.target.style.color=DIRK.color; }}
+                  onMouseLeave={function(e){ e.target.style.borderColor="var(--border2)"; e.target.style.color="var(--text3)"; }}>
+                  + Potje toevoegen
+                </button>
               </Card>
 
               {/* Eigen spaarrekeningen */}
@@ -1184,26 +1192,22 @@ export default function App() {
                 </div>
                 <div style={{ fontSize:".75rem", color:"var(--text3)", marginBottom:".75rem" }}>Niet meegenomen in maandcheck</div>
                 <div className="spaar-row" style={{ paddingBottom:".4rem", borderBottom:"1px solid var(--border)", marginBottom:".5rem" }}>
-                  {["Naam","Persoon","Bedrag","Sectie",""].map(function(h,i){ return <span key={i} style={Object.assign({},colHead,{textAlign:i===2?"right":"left"})}>{h.toUpperCase()}</span>; })}
+                  {["Naam","Persoon","Bedrag",""].map(function(h,i){ return <span key={i} style={Object.assign({},colHead,{textAlign:i===2?"right":"left"})}>{h.toUpperCase()}</span>; })}
                 </div>
                 {spaarMonth.filter(function(p){ return p.type === "eigen"; }).map(function(p) {
                   var u = USERS.find(function(u){ return u.id===p.owner; });
+                  var isOver = dragSpaarOver === p.id && dragSpaarId !== p.id;
                   return (
-                    <div key={p.id} className="spaar-row row-hover" style={{ padding:".3rem .25rem", marginBottom:".15rem" }}>
-                      <input value={p.label} onChange={function(e){ updateSpaar(p.id,"label",e.target.value); }} style={Object.assign({},inpFull,{border:"none",background:"transparent",fontSize:".85rem"})}/>
+                    <div key={p.id} className="spaar-row row-hover"
+                      draggable onDragStart={function(e){ handleSpaarDragStart(e,p.id); }} onDragOver={function(e){ handleSpaarDragOver(e,p.id); }} onDrop={function(e){ handleSpaarDrop(e,p.id); }} onDragEnd={handleSpaarDragEnd}
+                      style={{ padding:".3rem .25rem", marginBottom:".15rem", opacity: dragSpaarId===p.id?.4:1, borderTop: isOver?"2px solid var(--dirk)":"2px solid transparent", cursor:"grab" }}>
+                      <input value={p.label} onChange={function(e){ updateSpaar(p.id,"label",e.target.value); }} style={Object.assign({},inpFull,{border:"none",background:"transparent",fontSize:".85rem",cursor:"text"})}/>
                       <select value={p.owner} onChange={function(e){ updateSpaar(p.id,"owner",e.target.value); }}
                         style={{ border:"1px solid var(--border2)", borderRadius:6, padding:".3rem .4rem", fontSize:".78rem", color: u ? u.color : "inherit", background: u ? u.light : "white", fontFamily:"inherit", outline:"none" }}>
                         <option value="dirk">Dirk</option>
                         <option value="shelley">Shelley</option>
                       </select>
                       <NumInput value={p.planned||""} onChange={function(v){ updateSpaar(p.id,"planned",v); }} placeholder="0" accentColor={u ? u.color : undefined}/>
-                      <select value={p.type} onChange={function(e){ updateSpaar(p.id,"type",e.target.value); }}
-                        style={{ border:"1px solid var(--border2)", borderRadius:6, padding:".3rem .3rem", fontSize:".72rem", color:"var(--text2)", background:"var(--surface)", fontFamily:"inherit", outline:"none" }}>
-                        <option value="sparen">Sparen</option>
-                        <option value="kinderopvang">Kinderopvang</option>
-                        <option value="eigen">Eigen rek.</option>
-                        <option value="beleggen">Beleggen</option>
-                      </select>
                       <button style={delBtn} onClick={function(){ saveSpaar(spaarMonth.filter(function(x){ return x.id!==p.id; })); }}
                         onMouseEnter={function(e){ e.target.style.color="var(--red)"; e.target.style.background="var(--red-l)"; }}
                         onMouseLeave={function(e){ e.target.style.color="var(--text3)"; e.target.style.background="none"; }}>✕</button>
@@ -1224,26 +1228,22 @@ export default function App() {
                   <span style={{ fontSize:".82rem", fontWeight:600, color:"#7c3aed" }}>{fmt(totBeleg)}</span>
                 </div>
                 <div className="spaar-row" style={{ paddingBottom:".4rem", borderBottom:"1px solid var(--border)", marginBottom:".5rem" }}>
-                  {["Naam","Persoon","Bedrag","Sectie",""].map(function(h,i){ return <span key={i} style={Object.assign({},colHead,{textAlign:i===2?"right":"left"})}>{h.toUpperCase()}</span>; })}
+                  {["Naam","Persoon","Bedrag",""].map(function(h,i){ return <span key={i} style={Object.assign({},colHead,{textAlign:i===2?"right":"left"})}>{h.toUpperCase()}</span>; })}
                 </div>
                 {spaarMonth.filter(function(p){ return p.type === "beleggen"; }).map(function(p) {
                   var u = USERS.find(function(u){ return u.id===p.owner; });
+                  var isOver = dragSpaarOver === p.id && dragSpaarId !== p.id;
                   return (
-                    <div key={p.id} className="spaar-row row-hover" style={{ padding:".3rem .25rem", marginBottom:".15rem" }}>
-                      <input value={p.label} onChange={function(e){ updateSpaar(p.id,"label",e.target.value); }} style={Object.assign({},inpFull,{border:"none",background:"transparent",fontSize:".85rem"})}/>
+                    <div key={p.id} className="spaar-row row-hover"
+                      draggable onDragStart={function(e){ handleSpaarDragStart(e,p.id); }} onDragOver={function(e){ handleSpaarDragOver(e,p.id); }} onDrop={function(e){ handleSpaarDrop(e,p.id); }} onDragEnd={handleSpaarDragEnd}
+                      style={{ padding:".3rem .25rem", marginBottom:".15rem", opacity: dragSpaarId===p.id?.4:1, borderTop: isOver?"2px solid #7c3aed":"2px solid transparent", cursor:"grab" }}>
+                      <input value={p.label} onChange={function(e){ updateSpaar(p.id,"label",e.target.value); }} style={Object.assign({},inpFull,{border:"none",background:"transparent",fontSize:".85rem",cursor:"text"})}/>
                       <select value={p.owner} onChange={function(e){ updateSpaar(p.id,"owner",e.target.value); }}
                         style={{ border:"1px solid var(--border2)", borderRadius:6, padding:".3rem .4rem", fontSize:".78rem", color: u ? u.color : "inherit", background: u ? u.light : "white", fontFamily:"inherit", outline:"none" }}>
                         <option value="dirk">Dirk</option>
                         <option value="shelley">Shelley</option>
                       </select>
                       <NumInput value={p.planned||""} onChange={function(v){ updateSpaar(p.id,"planned",v); }} placeholder="0" accentColor="#7c3aed"/>
-                      <select value={p.type} onChange={function(e){ updateSpaar(p.id,"type",e.target.value); }}
-                        style={{ border:"1px solid var(--border2)", borderRadius:6, padding:".3rem .3rem", fontSize:".72rem", color:"var(--text2)", background:"var(--surface)", fontFamily:"inherit", outline:"none" }}>
-                        <option value="sparen">Sparen</option>
-                        <option value="kinderopvang">Kinderopvang</option>
-                        <option value="eigen">Eigen rek.</option>
-                        <option value="beleggen">Beleggen</option>
-                      </select>
                       <button style={delBtn} onClick={function(){ saveSpaar(spaarMonth.filter(function(x){ return x.id!==p.id; })); }}
                         onMouseEnter={function(e){ e.target.style.color="var(--red)"; e.target.style.background="var(--red-l)"; }}
                         onMouseLeave={function(e){ e.target.style.color="var(--text3)"; e.target.style.background="none"; }}>✕</button>
