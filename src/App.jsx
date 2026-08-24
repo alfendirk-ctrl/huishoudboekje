@@ -774,14 +774,15 @@ export default function App() {
     var newActuals = Object.assign({}, actuals);
     Object.entries(importSummary).forEach(function(pair) {
       var pid = pair[0], total = pair[1];
+      if (pid === "__overige__") return;
       newActuals[pid] = (newActuals[pid]||0) + total;
     });
     saveMonthData(Object.assign({}, monthData, { actuals: newActuals }));
 
-    // Learn from confirmed assignments (only non-unknown, non-memory ones)
+    // Learn from confirmed assignments (only non-unknown, non-overige, non-memory ones)
     var newMemory = Object.assign({}, memory);
     var learned = 0;
-    importRows.filter(function(r){ return r.include !== false && r.assignedId !== "__onbekend__"; }).forEach(function(r) {
+    importRows.filter(function(r){ return r.include !== false && r.assignedId !== "__onbekend__" && r.assignedId !== "__overige__"; }).forEach(function(r) {
       var k = memKey(r.desc);
       if (k && (!newMemory[k] || newMemory[k] !== r.assignedId)) {
         newMemory[k] = r.assignedId;
@@ -1361,7 +1362,7 @@ export default function App() {
                               onMouseLeave={function(e){ if(!isOpen) e.currentTarget.style.background="var(--surface)"; }}>
                               <span style={{ fontSize:".65rem", color:"var(--text3)" }}>{isOpen ? "▾" : "▸"}</span>
                               <div style={{ minWidth:0 }}>
-                                <span style={{ fontSize:".84rem", fontWeight:500 }}>{post ? post.label : pid}</span>
+                                <span style={{ fontSize:".84rem", fontWeight:500 }}>{post ? post.label : pid === "__overige__" ? "Overige (eenmalig)" : pid}</span>
                                 {over && <span className="badge" style={{ marginLeft:6, color:"var(--red)", background:"var(--red-l)", border:"1px solid #fecaca", fontSize:".62rem" }}>OVER</span>}
                               </div>
                               <span style={{ fontSize:".78rem", color:"var(--text3)", textAlign:"right" }}>{post ? fmt(post.planned) : "-"}</span>
@@ -1384,6 +1385,7 @@ export default function App() {
                                       <select value={r.assignedId} onChange={function(e){ var v=e.target.value; setImportRows(function(rs){ return rs.map(function(x,j){ return j===globalIdx?Object.assign({},x,{assignedId:v}):x; }); }); }}
                                         style={{ border:"1px solid var(--border2)", borderRadius:6, padding:".25rem .35rem", fontSize:".7rem", fontFamily:"inherit", background:"var(--surface)", maxWidth:120 }}>
                                         {posts.map(function(p){ return <option key={p.id} value={p.id}>{p.label}</option>; })}
+                                        <option value="__overige__">Overige (eenmalig)</option>
                                         <option value="__onbekend__">Niet toewijzen</option>
                                       </select>
                                       <span style={{ color:"var(--red)", fontSize:".78rem", fontWeight:500, flexShrink:0 }}>-{fmt(r.amount)}</span>
@@ -1416,6 +1418,7 @@ export default function App() {
                                   onChange={function(e){ var v=e.target.value; setImportRows(function(rs){ return rs.map(function(x,j){ return j===globalIdx?Object.assign({},x,{assignedId:v}):x; }); }); }}
                                   style={{ border:"1px solid #fcd34d", borderRadius:6, padding:".28rem .4rem", fontSize:".72rem", fontFamily:"inherit", background:"white", maxWidth:130 }}>
                                   <option value="__onbekend__">Kies post...</option>
+                                  <option value="__overige__">Overige (eenmalig)</option>
                                   {posts.map(function(p){ return <option key={p.id} value={p.id}>{p.label}</option>; })}
                                 </select>
                                 <span style={{ color:"var(--red)", fontSize:".78rem", fontWeight:500, flexShrink:0 }}>-{fmt(r.amount)}</span>
