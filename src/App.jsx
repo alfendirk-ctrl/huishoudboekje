@@ -643,15 +643,23 @@ export default function App() {
   var totSpaar     = allocD + allocS;
   var totSpaarOnly = spaarMonth.filter(function(p){ return p.type !== "beleggen"; }).reduce(function(s,p){ return s+(p.planned||0); }, 0);
   var totBeleg     = spaarMonth.filter(function(p){ return p.type === "beleggen"; }).reduce(function(s,p){ return s+(p.planned||0); }, 0);
-  var totSpaarAct = monthData.spaarActueel != null
+  var totSpaarActOnly = monthData.spaarActueel != null
     ? monthData.spaarActueel
-    : spaarMonth.reduce(function(s,p){ return s + (p.actual !== null && p.actual !== undefined ? p.actual : (p.planned||0)); }, 0);
+    : spaarMonth.filter(function(p){ return p.type !== "beleggen"; }).reduce(function(s,p){ return s + (p.actual !== null && p.actual !== undefined ? p.actual : (p.planned||0)); }, 0);
+  var totBelegAct = monthData.belegActueel != null
+    ? monthData.belegActueel
+    : spaarMonth.filter(function(p){ return p.type === "beleggen"; }).reduce(function(s,p){ return s + (p.actual !== null && p.actual !== undefined ? p.actual : (p.planned||0)); }, 0);
+  var totSpaarAct = totSpaarActOnly + totBelegAct;
 
   var chartData = useMemo(function() {
     return MONTHS_S.map(function(label, i) {
       var key = year+"-"+i;
       var md  = data.months[key];
-      if (md && md.spaarActueel != null) return { label:label, value:md.spaarActueel, current: i===month };
+      if (md && (md.spaarActueel != null || md.belegActueel != null)) {
+        var spVal = md.spaarActueel != null ? md.spaarActueel : 0;
+        var beVal = md.belegActueel != null ? md.belegActueel : 0;
+        return { label:label, value:spVal+beVal, current: i===month };
+      }
       var sp = data.spaar[key];
       var value = sp ? sp.reduce(function(s,p){ return s + (p.actual !== null && p.actual !== undefined ? p.actual : (i < month ? p.planned||0 : 0)); }, 0) : 0;
       return { label:label, value:value, current: i===month };
@@ -1210,16 +1218,31 @@ export default function App() {
 
               <Card>
                 <Sec>Spaardoel - 1.000 / maand</Sec>
-                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:".3rem" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 72px 80px", gap:"0 .5rem", alignItems:"center", marginBottom:".3rem" }}>
+                  <span style={{ fontSize:".75rem", color:"var(--text3)", fontWeight:600, letterSpacing:".08em", textTransform:"uppercase" }}></span>
+                  <span style={{ fontSize:".72rem", color:"var(--text3)", textAlign:"right" }}>GEPLAND</span>
+                  <span style={{ fontSize:".72rem", color:"var(--text3)", textAlign:"right" }}>ACTUEEL</span>
+                </div>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 72px 80px", gap:"0 .5rem", alignItems:"center", marginBottom:".4rem" }}>
                   <span style={{ fontSize:".82rem", color:"var(--text2)" }}>Sparen &amp; buffer</span>
-                  <span style={{ fontWeight:600, color:DIRK.color }}>{fmt(totSpaarOnly)}</span>
+                  <span style={{ fontWeight:600, color:DIRK.color, textAlign:"right", fontSize:".82rem" }}>{fmt(totSpaarOnly)}</span>
+                  <div style={{ display:"flex", justifyContent:"flex-end" }}>
+                    <DecInput value={monthData.spaarActueel != null ? monthData.spaarActueel : null}
+                      onCommit={function(v){ saveMonthData(Object.assign({}, monthData, { spaarActueel: v })); }}
+                      placeholder={String(totSpaarOnly.toFixed(0))} style={inpRight}/>
+                  </div>
                 </div>
-                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:".5rem" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 72px 80px", gap:"0 .5rem", alignItems:"center", marginBottom:".5rem" }}>
                   <span style={{ fontSize:".82rem", color:"var(--text2)" }}>Beleggen</span>
-                  <span style={{ fontWeight:600, color:"#7c3aed" }}>{fmt(totBeleg)}</span>
+                  <span style={{ fontWeight:600, color:"#7c3aed", textAlign:"right", fontSize:".82rem" }}>{fmt(totBeleg)}</span>
+                  <div style={{ display:"flex", justifyContent:"flex-end" }}>
+                    <DecInput value={monthData.belegActueel != null ? monthData.belegActueel : null}
+                      onCommit={function(v){ saveMonthData(Object.assign({}, monthData, { belegActueel: v })); }}
+                      placeholder={String(totBeleg.toFixed(0))} style={inpRight}/>
+                  </div>
                 </div>
-                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:".5rem" }}>
-                  <span style={{ fontSize:".84rem", color:"var(--text2)" }}>Totaal sparen + beleggen</span>
+                <div style={{ borderTop:"1px solid var(--border)", paddingTop:".4rem", display:"flex", justifyContent:"space-between", marginBottom:".5rem" }}>
+                  <span style={{ fontSize:".84rem", color:"var(--text2)" }}>Totaal</span>
                   <span style={{ fontWeight:700, color: totSpaar>=1000 ? "var(--green)" : totSpaar>=800 ? "var(--orange)" : "var(--red)" }}>{fmt(totSpaar)}</span>
                 </div>
                 <Bar value={totSpaar} max={1000} color={totSpaar>=1000?"var(--green)":totSpaar>=800?"var(--orange)":"var(--red)"} height={8}/>
@@ -1459,7 +1482,7 @@ export default function App() {
                   ? <div style={{ display:"flex", gap:".4rem" }}>
                       <span style={{ fontSize:".78rem", color:"var(--text3)" }}>Zeker?</span>
                       <button style={ghostBtn} onClick={function(){ setClearConfirm(false); }}>Nee</button>
-                      <button style={Object.assign({},ghostBtn,{color:"var(--red)"})} onClick={function(){ saveMonthData(Object.assign({},monthData,{actuals:{},txByPost:{},spaarActueel:null})); setClearConfirm(false); setOpenTxPost(null); }}>Ja, legen</button>
+                      <button style={Object.assign({},ghostBtn,{color:"var(--red)"})} onClick={function(){ saveMonthData(Object.assign({},monthData,{actuals:{},txByPost:{},spaarActueel:null,belegActueel:null})); setClearConfirm(false); setOpenTxPost(null); }}>Ja, legen</button>
                     </div>
                   : <button style={ghostBtn} onClick={function(){ setClearConfirm(true); }}>Alles legen</button>
                 }
@@ -1521,17 +1544,17 @@ export default function App() {
 
               <Card className="card-pad" style={{ padding:"1rem 1.1rem" }}>
                 <div className="check-row" style={{ padding:".35rem .4rem" }}>
-                  <span style={{ fontWeight:600, fontSize:".88rem" }}>Sparen &amp; Beleggen</span>
-                  <span style={{ textAlign:"right", fontSize:".8rem", color:"var(--text3)" }}>{fmt(totSpaar)}</span>
+                  <span style={{ fontWeight:600, fontSize:".88rem" }}>Sparen</span>
+                  <span style={{ textAlign:"right", fontSize:".8rem", color:"var(--text3)" }}>{fmt(totSpaarOnly)}</span>
                   <div style={{ display:"flex", justifyContent:"flex-end" }}>
                     <DecInput
                       value={monthData.spaarActueel != null ? monthData.spaarActueel : null}
                       onCommit={function(v){ saveMonthData(Object.assign({}, monthData, { spaarActueel: v })); }}
-                      placeholder={String(totSpaar.toFixed(0))}
+                      placeholder={String(totSpaarOnly.toFixed(0))}
                       style={inpRight}
                     />
                   </div>
-                  <div className="diff-col" style={{ display:"flex", justifyContent:"flex-end" }}><DiffBadge planned={totSpaar} actual={monthData.spaarActueel != null ? monthData.spaarActueel : null}/></div>
+                  <div className="diff-col" style={{ display:"flex", justifyContent:"flex-end" }}><DiffBadge planned={totSpaarOnly} actual={monthData.spaarActueel != null ? monthData.spaarActueel : null}/></div>
                 </div>
               </Card>
 
