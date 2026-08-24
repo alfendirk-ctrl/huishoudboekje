@@ -669,6 +669,10 @@ export default function App() {
   var [clearConfirm,setClearConfirm]= useState(false);
   var fileRef = useRef();
 
+  var acctPosts = importAcct === "samen"
+    ? posts.filter(function(p){ return p.group === "samen_vast" || p.group === "samen_var"; })
+    : posts.filter(function(p){ return p.group === importAcct; });
+
   var importSummary = useMemo(function() {
     var map = {};
     importRows.filter(function(r){ return r.include !== false && r.assignedId !== "__onbekend__"; }).forEach(function(r) {
@@ -689,7 +693,7 @@ export default function App() {
         return Object.assign({}, r, { include:true, assignedId:memory[k], _fromMemory:true });
       }
       // Fall back to keyword matching
-      return Object.assign({}, r, { include:true, assignedId:kwMatch(r.desc, posts) });
+      return Object.assign({}, r, { include:true, assignedId:kwMatch(r.desc, acctPosts) });
     });
     setImportRows(function(prev){ return [...result, ...prev.filter(function(r){ return r._fromTriage || r._fromMemory; })]; });
     setImportStep("preview");
@@ -1330,7 +1334,7 @@ export default function App() {
                                 onChange={function(e){ var v=e.target.value; setTriageRows(function(ts){ return ts.map(function(x,j){ return j===i ? Object.assign({},x,{assignedId:v}) : x; }); }); }}
                                 style={{ border:"1px solid var(--border2)", borderRadius:6, padding:".28rem .4rem", fontSize:".76rem", fontFamily:"inherit", background:"var(--surface)", marginLeft:"auto" }}>
                                 <option value="__onbekend__">Kies post...</option>
-                                {posts.map(function(p){ return <option key={p.id} value={p.id}>{p.label}</option>; })}
+                                {acctPosts.map(function(p){ return <option key={p.id} value={p.id}>{p.label}</option>; })}
                               </select>
                             )}
                           </div>
@@ -1389,7 +1393,7 @@ export default function App() {
                                       </div>
                                       <select value={r.assignedId} onChange={function(e){ var v=e.target.value; setImportRows(function(rs){ return rs.map(function(x,j){ return j===globalIdx?Object.assign({},x,{assignedId:v}):x; }); }); }}
                                         style={{ border:"1px solid var(--border2)", borderRadius:6, padding:".25rem .35rem", fontSize:".7rem", fontFamily:"inherit", background:"var(--surface)", maxWidth:120 }}>
-                                        {posts.map(function(p){ return <option key={p.id} value={p.id}>{p.label}</option>; })}
+                                        {acctPosts.map(function(p){ return <option key={p.id} value={p.id}>{p.label}</option>; })}
                                         <option value="__overige__">Overige (eenmalig)</option>
                                         <option value="__onbekend__">Niet toewijzen</option>
                                       </select>
@@ -1424,7 +1428,7 @@ export default function App() {
                                   style={{ border:"1px solid #fcd34d", borderRadius:6, padding:".28rem .4rem", fontSize:".72rem", fontFamily:"inherit", background:"white", maxWidth:130 }}>
                                   <option value="__onbekend__">Kies post...</option>
                                   <option value="__overige__">Overige (eenmalig)</option>
-                                  {posts.map(function(p){ return <option key={p.id} value={p.id}>{p.label}</option>; })}
+                                  {acctPosts.map(function(p){ return <option key={p.id} value={p.id}>{p.label}</option>; })}
                                 </select>
                                 <span style={{ color:"var(--red)", fontSize:".78rem", fontWeight:500, flexShrink:0 }}>-{fmt(r.amount)}</span>
                               </div>
