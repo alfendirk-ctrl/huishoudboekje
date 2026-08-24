@@ -396,18 +396,20 @@ function AvailBar({ user, available, allocated }) {
   );
 }
 function BarChart({ data }) {
-  var max = Math.max.apply(null, data.map(function(d){ return d.value; }).concat([1000]));
+  var max = Math.max.apply(null, data.map(function(d){ return Math.max(d.value, d.planned||0); }).concat([1000]));
   return (
-    <div style={{ display:"flex", gap:6, alignItems:"flex-end", height:130 }}>
+    <div style={{ display:"flex", gap:4, alignItems:"flex-end", height:145 }}>
       {data.map(function(d) {
-        var h   = Math.max((d.value / max) * 100, 2);
-        var col = d.current ? "var(--dirk)" : d.value >= 1000 ? "var(--green)" : "#d4d0c8";
-        var bdr = d.current ? "0 0 0 2px var(--dirk-b)" : "none";
+        var hAct  = max > 0 ? Math.max((d.value / max) * 100, d.value > 0 ? 2 : 0) : 0;
+        var hPlan = max > 0 ? Math.max(((d.planned||0) / max) * 100, (d.planned||0) > 0 ? 2 : 0) : 0;
+        var col   = d.current ? "var(--dirk)" : d.value >= (d.planned||0) ? "var(--green)" : "#d4d0c8";
+        var bdr   = d.current ? "0 0 0 2px var(--dirk-b)" : "none";
         return (
           <div key={d.label} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:3 }}>
-            {d.value > 0 && <span style={{ fontSize:".58rem", color:"var(--text3)", transform:"rotate(-30deg)", whiteSpace:"nowrap" }}>{fmt(d.value).replace("€","")}</span>}
-            <div style={{ width:"100%", height:100, display:"flex", alignItems:"flex-end" }}>
-              <div style={{ width:"100%", height:h+"%", background:col, borderRadius:"4px 4px 0 0", boxShadow:bdr, transition:"height .4s ease" }}/>
+            {d.value > 0 && <span style={{ fontSize:".58rem", color:"var(--text3)", transform:"rotate(-30deg)", whiteSpace:"nowrap" }}>{fmt(d.value).replace("€","").replace("•••","•••")}</span>}
+            <div style={{ width:"100%", height:100, display:"flex", alignItems:"flex-end", gap:2 }}>
+              <div title="Gepland" style={{ flex:1, height:hPlan+"%", background:"var(--surface2)", border:"1px solid var(--border)", borderRadius:"3px 3px 0 0", transition:"height .4s ease", boxSizing:"border-box", minHeight: hPlan > 0 ? 2 : 0 }}/>
+              <div title="Gelukt" style={{ flex:1, height:hAct+"%", background:col, borderRadius:"3px 3px 0 0", boxShadow:bdr, transition:"height .4s ease", minHeight: hAct > 0 ? 2 : 0 }}/>
             </div>
             <span style={{ fontSize:".65rem", color: d.current ? "var(--dirk)" : "var(--text3)", fontWeight: d.current ? 600 : 400 }}>{d.label}</span>
           </div>
@@ -662,14 +664,17 @@ export default function App() {
     return MONTHS_S.map(function(label, i) {
       var key = year+"-"+i;
       var md  = data.months[key];
+      var sp  = data.spaar[key];
+      var planned = sp ? sp.reduce(function(s,p){ return s + (p.planned||0); }, 0) : 0;
+      var value;
       if (md && (md.spaarActueel != null || md.belegActueel != null)) {
         var spVal = md.spaarActueel != null ? md.spaarActueel : 0;
         var beVal = md.belegActueel != null ? md.belegActueel : 0;
-        return { label:label, value:spVal+beVal, current: i===month };
+        value = spVal + beVal;
+      } else {
+        value = sp ? sp.reduce(function(s,p){ return s + (p.actual !== null && p.actual !== undefined ? p.actual : (i < month ? p.planned||0 : 0)); }, 0) : 0;
       }
-      var sp = data.spaar[key];
-      var value = sp ? sp.reduce(function(s,p){ return s + (p.actual !== null && p.actual !== undefined ? p.actual : (i < month ? p.planned||0 : 0)); }, 0) : 0;
-      return { label:label, value:value, current: i===month };
+      return { label:label, value:value, planned:planned, current: i===month };
     });
   }, [data.spaar, data.months, year, month]);
 
@@ -1265,11 +1270,15 @@ export default function App() {
               <Card>
                 <Sec>Gespaard per maand - {year}</Sec>
                 <BarChart data={chartData}/>
-                <div style={{ display:"flex", gap:"1rem", marginTop:".75rem", fontSize:".72rem", color:"var(--text3)" }}>
+                <div style={{ display:"flex", gap:"1rem", marginTop:".75rem", fontSize:".72rem", color:"var(--text3)", flexWrap:"wrap" }}>
+                  <span style={{ display:"flex", alignItems:"center", gap:4 }}>
+                    <span style={{ width:8, height:12, borderRadius:2, background:"var(--surface2)", border:"1px solid var(--border)", display:"inline-block" }}/>
+                    Gepland
+                  </span>
                   {[["var(--dirk)","Deze maand"],["var(--green)","Doel gehaald"],["#d4d0c8","Onder doel"]].map(function(pair) {
                     return (
-                      <span key={pair[1]} style={{ display:"flex", alignItems:"center", gap:3 }}>
-                        <span style={{ width:10, height:10, borderRadius:2, background:pair[0], display:"inline-block", marginRight:3 }}/>
+                      <span key={pair[1]} style={{ display:"flex", alignItems:"center", gap:4 }}>
+                        <span style={{ width:8, height:12, borderRadius:2, background:pair[0], display:"inline-block" }}/>
                         {pair[1]}
                       </span>
                     );
