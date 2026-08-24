@@ -80,13 +80,13 @@ const DEFAULT_POSTS = [
 ];
 
 const DEFAULT_SPAAR = [
-  { id:"sp_d1", owner:"dirk",    label:"Spaarrekening",   planned:150, type:"sparen"   },
+  { id:"sp_d1", owner:"dirk",    label:"Spaarrekening",   planned:150, type:"eigen"    },
   { id:"sp_d2", owner:"dirk",    label:"Vakantie",        planned:75,  type:"sparen"   },
   { id:"sp_d3", owner:"dirk",    label:"Buffer",          planned:75,  type:"sparen"   },
   { id:"sp_d4", owner:"dirk",    label:"Maeve potje",     planned:75,  type:"sparen"   },
   { id:"sp_d5", owner:"dirk",    label:"Beleggen",        planned:250, type:"beleggen" },
   { id:"sp_d6", owner:"dirk",    label:"Crypto",          planned:25,  type:"beleggen" },
-  { id:"sp_s1", owner:"shelley", label:"Spaarrekening",   planned:50,  type:"sparen"   },
+  { id:"sp_s1", owner:"shelley", label:"Spaarrekening",   planned:50,  type:"eigen"    },
   { id:"sp_s2", owner:"shelley", label:"Maeve spaarrek.", planned:25,  type:"sparen"   },
   { id:"sp_s3", owner:"shelley", label:"By Bae",          planned:50,  type:"sparen"   },
 ];
@@ -107,14 +107,18 @@ function repairSpaarData(data) {
     var arr = spaar[mk];
     if (!Array.isArray(arr)) { newSpaar[mk] = arr; return; }
     var fixed = arr.map(function(p) {
-      if (p.label != null && p.owner != null && p.type != null) return p;
+      var needsRepair = p.label == null || p.owner == null || p.type == null;
+      var needsEigenMigration = p.type === "sparen" && p.label === "Spaarrekening";
+      if (!needsRepair && !needsEigenMigration) return p;
       changed = true;
       var def = DEFAULT_SPAAR.find(function(x){ return x.id === p.id; });
-      return Object.assign({}, p, {
+      var result = Object.assign({}, p, {
         label: p.label != null ? p.label : (def ? def.label : "Potje"),
         owner: p.owner != null ? p.owner : (def ? def.owner : "dirk"),
         type:  p.type  != null ? p.type  : (def ? def.type  : "sparen"),
       });
+      if (result.label === "Spaarrekening" && result.type === "sparen") result.type = "eigen";
+      return result;
     });
     newSpaar[mk] = fixed;
   });
@@ -291,7 +295,7 @@ var CSS_STR = [
   ".check-row{display:grid;grid-template-columns:1fr 80px 88px 72px;gap:0 .4rem;align-items:center;}",
   ".check-head{display:grid;grid-template-columns:1fr 80px 88px 72px;gap:0 .4rem;}",
   ".post-row{display:grid;grid-template-columns:1fr 88px 40px;gap:.5rem;align-items:center;}",
-  ".spaar-row{display:grid;grid-template-columns:1fr 68px 80px 40px 40px;gap:.5rem;align-items:center;}",
+  ".spaar-row{display:grid;grid-template-columns:1fr 68px 80px 82px 36px;gap:.5rem;align-items:center;}",
   "@media(max-width:640px){",
   "  .kpi-grid{grid-template-columns:repeat(2,1fr);}",
   "  .kpi-5{grid-column:1/-1;}",
@@ -300,7 +304,7 @@ var CSS_STR = [
   "  .check-head{grid-template-columns:1fr 76px 82px;}",
   "  .diff-col{display:none;}",
   "  .post-row{grid-template-columns:1fr 80px 40px;}",
-  "  .spaar-row{grid-template-columns:1fr 56px 72px 36px 36px;}",
+  "  .spaar-row{grid-template-columns:1fr 56px 72px 74px 32px;}",
   "  .tab-btn{padding:.55rem .7rem;font-size:.78rem;}",
   "  .header-inner{flex-direction:column;align-items:flex-start;gap:.5rem;}",
   "  .card-pad{padding:.9rem;}",
@@ -436,6 +440,8 @@ export default function App() {
   var [reviewPopup, setReviewPopup] = useState(null);
   var [reviewChecked, setReviewChecked] = useState({});
   var [expandedPosts, setExpandedPosts] = useState({});
+  var [dragPostId,   setDragPostId]   = useState(null);
+  var [dragOverId,   setDragOverId]   = useState(null);
   var isPullDataRef = useRef(false);
   var lastLocalEditRef = useRef(0);
 
@@ -448,6 +454,15 @@ export default function App() {
       setMemory(results[1]);
       setLoaded(true);
       if (repaired !== raw) saveShared(repaired); // eenmalig gecorrigeerde data terugschrijven
+      // Start op eerste niet-afgesloten maand van dit jaar
+      var y = now.getFullYear();
+      var closedMs = Object.keys(repaired.months || {})
+        .filter(function(k){ return k.startsWith(y+"-") && repaired.months[k] && repaired.months[k].closed; })
+        .map(function(k){ return parseInt(k.split("-")[1]); });
+      if (closedMs.length > 0) {
+        var next = Math.min(Math.max.apply(null, closedMs) + 1, 11);
+        setMonth(next);
+      }
     });
   }, []);
 
@@ -540,6 +555,7 @@ export default function App() {
       return { id:p.id, label:p.label, planned:p.planned||0, actual:a, diff:a-(p.planned||0) };
     }).sort(function(a,b){ return Math.abs(b.diff)-Math.abs(a.diff); });
     notify("Maand afgesloten");
+    setMonth(function(m){ return Math.min(m + 1, 11); });
     if (diffs.length > 0) {
       var initChecked = {};
       diffs.forEach(function(d){ initChecked[d.id] = true; });
@@ -561,6 +577,23 @@ export default function App() {
   }
   function deletePost(id) { setPosts(function(ps){ return ps.filter(function(p){ return p.id !== id; }); }); }
   function addPost(gid)   { setPosts(function(ps){ return [...ps, { id:newId(), group:gid, label:"Nieuwe post", planned:0 }]; }); }
+  function handleDragStart(e, id) { setDragPostId(id); e.dataTransfer.effectAllowed = "move"; }
+  function handleDragOver(e, id)  { e.preventDefault(); setDragOverId(id); }
+  function handleDragEnd()        { setDragPostId(null); setDragOverId(null); }
+  function handleDrop(e, targetId) {
+    e.preventDefault();
+    if (!dragPostId || dragPostId === targetId) { setDragPostId(null); setDragOverId(null); return; }
+    setPosts(function(ps) {
+      var from = ps.findIndex(function(p){ return p.id === dragPostId; });
+      var to   = ps.findIndex(function(p){ return p.id === targetId; });
+      if (from < 0 || to < 0) return ps;
+      var next = ps.slice();
+      next.splice(from, 1);
+      next.splice(to, 0, ps[from]);
+      return next;
+    });
+    setDragPostId(null); setDragOverId(null);
+  }
 
   // Spaar
   var spaarMonth = useMemo(function() {
@@ -650,14 +683,18 @@ export default function App() {
   var allocD = spaarMonth.filter(function(p){ return p.owner==="dirk"; }).reduce(function(s,p){ return s+(p.planned||0); }, 0);
   var allocS = spaarMonth.filter(function(p){ return p.owner==="shelley"; }).reduce(function(s,p){ return s+(p.planned||0); }, 0);
   var totSpaar     = allocD + allocS;
-  var totSpaarOnly = spaarMonth.filter(function(p){ return p.type !== "beleggen"; }).reduce(function(s,p){ return s+(p.planned||0); }, 0);
+  // totSpaarOnly = only regular savings (not beleggen, not eigen spaarrekening, not kinderopvang) — used for maandcheck "Sparen" row
+  var totSpaarOnly = spaarMonth.filter(function(p){ return p.type === "sparen"; }).reduce(function(s,p){ return s+(p.planned||0); }, 0);
   var totBeleg     = spaarMonth.filter(function(p){ return p.type === "beleggen"; }).reduce(function(s,p){ return s+(p.planned||0); }, 0);
+  var kinderopvangPost = spaarMonth.find(function(p){ return p.type === "kinderopvang"; });
+  var kinderopvangPlan = kinderopvangPost ? (kinderopvangPost.planned || 0) : 0;
   var totSpaarActOnly = monthData.spaarActueel != null
     ? monthData.spaarActueel
-    : spaarMonth.filter(function(p){ return p.type !== "beleggen"; }).reduce(function(s,p){ return s + (p.actual !== null && p.actual !== undefined ? p.actual : (p.planned||0)); }, 0);
+    : spaarMonth.filter(function(p){ return p.type === "sparen"; }).reduce(function(s,p){ return s + (p.actual !== null && p.actual !== undefined ? p.actual : (p.planned||0)); }, 0);
   var totBelegAct = monthData.belegActueel != null
     ? monthData.belegActueel
     : spaarMonth.filter(function(p){ return p.type === "beleggen"; }).reduce(function(s,p){ return s + (p.actual !== null && p.actual !== undefined ? p.actual : (p.planned||0)); }, 0);
+  var kinderopvangAct = monthData.kinderopvangActueel != null ? monthData.kinderopvangActueel : null;
   var totSpaarAct = totSpaarActOnly + totBelegAct;
 
   var chartData = useMemo(function() {
@@ -1047,9 +1084,16 @@ export default function App() {
                       <span/>
                     </div>
                     {gPosts.map(function(post) {
+                      var isOver = dragOverId === post.id && dragPostId !== post.id;
                       return (
-                        <div key={post.id} className="row-hover" className="post-row row-hover" style={{ padding:".3rem .25rem", marginBottom:".15rem" }}>
-                          <input value={post.label} onChange={function(e){ updatePost(post.id,"label",e.target.value); }} style={Object.assign({},inpFull,{border:"none",borderBottom:"1px solid var(--border2)",borderRadius:0,background:"transparent",fontSize:".85rem"})}/>
+                        <div key={post.id} className="post-row row-hover"
+                          draggable
+                          onDragStart={function(e){ handleDragStart(e, post.id); }}
+                          onDragOver={function(e){ handleDragOver(e, post.id); }}
+                          onDrop={function(e){ handleDrop(e, post.id); }}
+                          onDragEnd={handleDragEnd}
+                          style={{ padding:".3rem .25rem", marginBottom:".15rem", opacity: dragPostId===post.id ? .4 : 1, borderTop: isOver ? "2px solid var(--dirk)" : "2px solid transparent", cursor:"grab" }}>
+                          <input value={post.label} onChange={function(e){ updatePost(post.id,"label",e.target.value); }} style={Object.assign({},inpFull,{border:"none",borderBottom:"1px solid var(--border2)",borderRadius:0,background:"transparent",fontSize:".85rem",cursor:"text"})}/>
                           <NumInput value={post.planned||""} onChange={function(v){ updatePost(post.id,"planned",v); }} placeholder="0" accentColor={owner ? owner.color : undefined}/>
                           <button style={delBtn} onClick={function(){ deletePost(post.id); }}
                             onMouseEnter={function(e){ e.target.style.color="var(--red)"; e.target.style.background="var(--red-l)"; }}
@@ -1087,12 +1131,12 @@ export default function App() {
               <Card>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:".85rem" }}>
                   <Sec>Sparen &amp; Buffer</Sec>
-                  <span style={{ fontSize:".82rem", fontWeight:600, color:DIRK.color }}>{fmt(totSpaarOnly)}</span>
+                  <span style={{ fontSize:".82rem", fontWeight:600, color:DIRK.color }}>{fmt(totSpaarOnly + kinderopvangPlan)}</span>
                 </div>
                 <div className="spaar-row" style={{ paddingBottom:".4rem", borderBottom:"1px solid var(--border)", marginBottom:".5rem" }}>
-                  {["Naam","Persoon","Bedrag","",""].map(function(h,i){ return <span key={i} style={Object.assign({},colHead,{textAlign:i===2?"right":"left"})}>{h.toUpperCase()}</span>; })}
+                  {["Naam","Persoon","Bedrag","Sectie",""].map(function(h,i){ return <span key={i} style={Object.assign({},colHead,{textAlign:i===2?"right":"left"})}>{h.toUpperCase()}</span>; })}
                 </div>
-                {spaarMonth.filter(function(p){ return p.type !== "beleggen"; }).map(function(p) {
+                {spaarMonth.filter(function(p){ return p.type === "sparen" || p.type === "kinderopvang"; }).map(function(p) {
                   var u = USERS.find(function(u){ return u.id===p.owner; });
                   return (
                     <div key={p.id} className="spaar-row row-hover" style={{ padding:".3rem .25rem", marginBottom:".15rem" }}>
@@ -1103,20 +1147,73 @@ export default function App() {
                         <option value="shelley">Shelley</option>
                       </select>
                       <NumInput value={p.planned||""} onChange={function(v){ updateSpaar(p.id,"planned",v); }} placeholder="0" accentColor={u ? u.color : undefined}/>
-                      <button title="Verplaats naar Beleggen" onClick={function(){ updateSpaar(p.id,"type","beleggen"); }}
-                        style={{ background:"none", border:"1px solid var(--border2)", color:"var(--text3)", cursor:"pointer", fontSize:".72rem", borderRadius:6, padding:"4px 6px", minWidth:36, minHeight:36, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"inherit" }}
-                        onMouseEnter={function(e){ e.currentTarget.style.borderColor="#7c3aed"; e.currentTarget.style.color="#7c3aed"; }}
-                        onMouseLeave={function(e){ e.currentTarget.style.borderColor="var(--border2)"; e.currentTarget.style.color="var(--text3)"; }}>→</button>
+                      <select value={p.type} onChange={function(e){ updateSpaar(p.id,"type",e.target.value); }}
+                        style={{ border:"1px solid var(--border2)", borderRadius:6, padding:".3rem .3rem", fontSize:".72rem", color:"var(--text2)", background:"var(--surface)", fontFamily:"inherit", outline:"none" }}>
+                        <option value="sparen">Sparen</option>
+                        <option value="kinderopvang">Kinderopvang</option>
+                        <option value="eigen">Eigen rek.</option>
+                        <option value="beleggen">Beleggen</option>
+                      </select>
                       <button style={delBtn} onClick={function(){ saveSpaar(spaarMonth.filter(function(x){ return x.id!==p.id; })); }}
                         onMouseEnter={function(e){ e.target.style.color="var(--red)"; e.target.style.background="var(--red-l)"; }}
                         onMouseLeave={function(e){ e.target.style.color="var(--text3)"; e.target.style.background="none"; }}>✕</button>
                     </div>
                   );
                 })}
-                <button style={addBtn} onClick={function(){ saveSpaar([...spaarMonth,{id:newId(),owner:"dirk",label:"Nieuw potje",planned:0,actual:null,type:"sparen"}]); }}
+                <div style={{ display:"flex", gap:".5rem", flexWrap:"wrap" }}>
+                  <button style={addBtn} onClick={function(){ saveSpaar([...spaarMonth,{id:newId(),owner:"dirk",label:"Nieuw potje",planned:0,actual:null,type:"sparen"}]); }}
+                    onMouseEnter={function(e){ e.target.style.borderColor=DIRK.color; e.target.style.color=DIRK.color; }}
+                    onMouseLeave={function(e){ e.target.style.borderColor="var(--border2)"; e.target.style.color="var(--text3)"; }}>
+                    + Potje toevoegen
+                  </button>
+                  {!kinderopvangPost && (
+                    <button style={Object.assign({},addBtn,{borderColor:"#fbbf24",color:"#92400e"})} onClick={function(){ saveSpaar([...spaarMonth,{id:newId(),owner:"dirk",label:"Kinderopvang",planned:0,actual:null,type:"kinderopvang"}]); }}
+                      onMouseEnter={function(e){ e.target.style.borderColor="#f59e0b"; }}
+                      onMouseLeave={function(e){ e.target.style.borderColor="#fbbf24"; }}>
+                      + Kinderopvang
+                    </button>
+                  )}
+                </div>
+              </Card>
+
+              {/* Eigen spaarrekeningen */}
+              <Card>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:".85rem" }}>
+                  <Sec>Eigen spaarrekeningen</Sec>
+                  <span style={{ fontSize:".82rem", fontWeight:600, color:"var(--text2)" }}>{fmt(spaarMonth.filter(function(p){ return p.type==="eigen"; }).reduce(function(s,p){ return s+(p.planned||0); },0))}</span>
+                </div>
+                <div style={{ fontSize:".75rem", color:"var(--text3)", marginBottom:".75rem" }}>Niet meegenomen in maandcheck</div>
+                <div className="spaar-row" style={{ paddingBottom:".4rem", borderBottom:"1px solid var(--border)", marginBottom:".5rem" }}>
+                  {["Naam","Persoon","Bedrag","Sectie",""].map(function(h,i){ return <span key={i} style={Object.assign({},colHead,{textAlign:i===2?"right":"left"})}>{h.toUpperCase()}</span>; })}
+                </div>
+                {spaarMonth.filter(function(p){ return p.type === "eigen"; }).map(function(p) {
+                  var u = USERS.find(function(u){ return u.id===p.owner; });
+                  return (
+                    <div key={p.id} className="spaar-row row-hover" style={{ padding:".3rem .25rem", marginBottom:".15rem" }}>
+                      <input value={p.label} onChange={function(e){ updateSpaar(p.id,"label",e.target.value); }} style={Object.assign({},inpFull,{border:"none",background:"transparent",fontSize:".85rem"})}/>
+                      <select value={p.owner} onChange={function(e){ updateSpaar(p.id,"owner",e.target.value); }}
+                        style={{ border:"1px solid var(--border2)", borderRadius:6, padding:".3rem .4rem", fontSize:".78rem", color: u ? u.color : "inherit", background: u ? u.light : "white", fontFamily:"inherit", outline:"none" }}>
+                        <option value="dirk">Dirk</option>
+                        <option value="shelley">Shelley</option>
+                      </select>
+                      <NumInput value={p.planned||""} onChange={function(v){ updateSpaar(p.id,"planned",v); }} placeholder="0" accentColor={u ? u.color : undefined}/>
+                      <select value={p.type} onChange={function(e){ updateSpaar(p.id,"type",e.target.value); }}
+                        style={{ border:"1px solid var(--border2)", borderRadius:6, padding:".3rem .3rem", fontSize:".72rem", color:"var(--text2)", background:"var(--surface)", fontFamily:"inherit", outline:"none" }}>
+                        <option value="sparen">Sparen</option>
+                        <option value="kinderopvang">Kinderopvang</option>
+                        <option value="eigen">Eigen rek.</option>
+                        <option value="beleggen">Beleggen</option>
+                      </select>
+                      <button style={delBtn} onClick={function(){ saveSpaar(spaarMonth.filter(function(x){ return x.id!==p.id; })); }}
+                        onMouseEnter={function(e){ e.target.style.color="var(--red)"; e.target.style.background="var(--red-l)"; }}
+                        onMouseLeave={function(e){ e.target.style.color="var(--text3)"; e.target.style.background="none"; }}>✕</button>
+                    </div>
+                  );
+                })}
+                <button style={addBtn} onClick={function(){ saveSpaar([...spaarMonth,{id:newId(),owner:"dirk",label:"Spaarrekening",planned:0,actual:null,type:"eigen"}]); }}
                   onMouseEnter={function(e){ e.target.style.borderColor=DIRK.color; e.target.style.color=DIRK.color; }}
                   onMouseLeave={function(e){ e.target.style.borderColor="var(--border2)"; e.target.style.color="var(--text3)"; }}>
-                  + Potje toevoegen
+                  + Eigen rekening toevoegen
                 </button>
               </Card>
 
@@ -1127,7 +1224,7 @@ export default function App() {
                   <span style={{ fontSize:".82rem", fontWeight:600, color:"#7c3aed" }}>{fmt(totBeleg)}</span>
                 </div>
                 <div className="spaar-row" style={{ paddingBottom:".4rem", borderBottom:"1px solid var(--border)", marginBottom:".5rem" }}>
-                  {["Naam","Persoon","Bedrag","",""].map(function(h,i){ return <span key={i} style={Object.assign({},colHead,{textAlign:i===2?"right":"left"})}>{h.toUpperCase()}</span>; })}
+                  {["Naam","Persoon","Bedrag","Sectie",""].map(function(h,i){ return <span key={i} style={Object.assign({},colHead,{textAlign:i===2?"right":"left"})}>{h.toUpperCase()}</span>; })}
                 </div>
                 {spaarMonth.filter(function(p){ return p.type === "beleggen"; }).map(function(p) {
                   var u = USERS.find(function(u){ return u.id===p.owner; });
@@ -1140,10 +1237,13 @@ export default function App() {
                         <option value="shelley">Shelley</option>
                       </select>
                       <NumInput value={p.planned||""} onChange={function(v){ updateSpaar(p.id,"planned",v); }} placeholder="0" accentColor="#7c3aed"/>
-                      <button title="Verplaats naar Sparen" onClick={function(){ updateSpaar(p.id,"type","sparen"); }}
-                        style={{ background:"none", border:"1px solid var(--border2)", color:"var(--text3)", cursor:"pointer", fontSize:".72rem", borderRadius:6, padding:"4px 6px", minWidth:36, minHeight:36, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"inherit" }}
-                        onMouseEnter={function(e){ e.currentTarget.style.borderColor=DIRK.color; e.currentTarget.style.color=DIRK.color; }}
-                        onMouseLeave={function(e){ e.currentTarget.style.borderColor="var(--border2)"; e.currentTarget.style.color="var(--text3)"; }}>←</button>
+                      <select value={p.type} onChange={function(e){ updateSpaar(p.id,"type",e.target.value); }}
+                        style={{ border:"1px solid var(--border2)", borderRadius:6, padding:".3rem .3rem", fontSize:".72rem", color:"var(--text2)", background:"var(--surface)", fontFamily:"inherit", outline:"none" }}>
+                        <option value="sparen">Sparen</option>
+                        <option value="kinderopvang">Kinderopvang</option>
+                        <option value="eigen">Eigen rek.</option>
+                        <option value="beleggen">Beleggen</option>
+                      </select>
                       <button style={delBtn} onClick={function(){ saveSpaar(spaarMonth.filter(function(x){ return x.id!==p.id; })); }}
                         onMouseEnter={function(e){ e.target.style.color="var(--red)"; e.target.style.background="var(--red-l)"; }}
                         onMouseLeave={function(e){ e.target.style.color="var(--text3)"; e.target.style.background="none"; }}>✕</button>
@@ -1575,6 +1675,31 @@ export default function App() {
                   </div>
                   <div className="diff-col" style={{ display:"flex", justifyContent:"flex-end" }}><DiffBadge planned={totSpaarOnly} actual={monthData.spaarActueel != null ? monthData.spaarActueel : null} invert/></div>
                 </div>
+                {kinderopvangPost && (
+                  <div className="check-row" style={{ padding:".35rem .4rem", borderTop:"1px solid var(--border)", marginTop:".35rem" }}>
+                    <span style={{ fontSize:".88rem", color:"var(--text2)" }}>Kinderopvang</span>
+                    <span style={{ textAlign:"right", fontSize:".8rem", color:"var(--text3)" }}>{fmt(kinderopvangPlan)}</span>
+                    <div style={{ display:"flex", justifyContent:"flex-end" }}>
+                      <DecInput
+                        value={kinderopvangAct}
+                        onCommit={function(v){ saveMonthData(Object.assign({}, monthData, { kinderopvangActueel: v })); }}
+                        placeholder={String(kinderopvangPlan.toFixed(0))}
+                        style={inpRight}
+                      />
+                    </div>
+                    <div className="diff-col" style={{ display:"flex", justifyContent:"flex-end" }}><DiffBadge planned={kinderopvangPlan} actual={kinderopvangAct} invert/></div>
+                  </div>
+                )}
+                {kinderopvangPost && (
+                  <div className="check-row" style={{ padding:".35rem .4rem", borderTop:"1px solid var(--border)", marginTop:".35rem" }}>
+                    <span style={{ fontWeight:600, fontSize:".85rem", color:"var(--text2)" }}>Totaal gespaard</span>
+                    <span/>
+                    <div style={{ textAlign:"right", fontSize:".88rem", fontWeight:600 }}>
+                      {fmt((monthData.spaarActueel != null ? monthData.spaarActueel : totSpaarOnly) + (kinderopvangAct != null ? kinderopvangAct : kinderopvangPlan))}
+                    </div>
+                    <div/>
+                  </div>
+                )}
               </Card>
 
               <Card style={{ background:"var(--text)", border:"none", padding:"1rem 1.25rem" }}>
