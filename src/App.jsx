@@ -121,13 +121,11 @@ function repairSpaarData(data) {
       if (result.label === "Spaarrekening" && result.type === "sparen") result.type = "eigen";
       return result;
     });
-    // Add any DEFAULT_SPAAR items missing from this month (e.g. newly added kinderopvang)
-    DEFAULT_SPAAR.forEach(function(def) {
-      if (!fixed.find(function(p){ return p.id === def.id; })) {
-        fixed = fixed.concat([Object.assign({}, def, { actual: null })]);
-        changed = true;
-      }
-    });
+    // Add kinderopvang item if missing (newly introduced default; only inject once)
+    if (!fixed.find(function(p){ return p.type === "kinderopvang"; })) {
+      var kdv = DEFAULT_SPAAR.find(function(d){ return d.type === "kinderopvang"; });
+      if (kdv) { fixed = fixed.concat([Object.assign({}, kdv, { actual: null })]); changed = true; }
+    }
     newSpaar[mk] = fixed;
   });
   if (!changed) return data;
@@ -641,11 +639,10 @@ export default function App() {
         type:  p.type  != null ? p.type  : (def ? def.type  : "sparen"),
       });
     });
-    DEFAULT_SPAAR.forEach(function(def) {
-      if (!repaired.find(function(p){ return p.id === def.id; })) {
-        repaired = repaired.concat([Object.assign({}, def, { actual: null })]);
-      }
-    });
+    if (!repaired.find(function(p){ return p.type === "kinderopvang"; })) {
+      var kdv = DEFAULT_SPAAR.find(function(d){ return d.type === "kinderopvang"; });
+      if (kdv) repaired = repaired.concat([Object.assign({}, kdv, { actual: null })]);
+    }
     return repaired;
   }, [mk, data.spaar]);
 
