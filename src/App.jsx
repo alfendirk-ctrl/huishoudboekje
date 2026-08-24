@@ -1356,16 +1356,16 @@ export default function App() {
                         return (
                           <div key={pid} style={{ borderBottom:"1px solid var(--border)" }}>
                             <div onClick={function(){ setExpandedPosts(function(ep){ return Object.assign({},ep,{[pid]:!ep[pid]}); }); }}
-                              style={{ display:"grid", gridTemplateColumns:"20px 1fr 80px 90px", padding:".5rem .85rem", alignItems:"center", cursor:"pointer", background: isOpen ? "var(--dirk-l)" : "var(--surface)" }}
+                              style={{ display:"grid", gridTemplateColumns:"20px 1fr 80px 90px", padding:".65rem .85rem", alignItems:"center", cursor:"pointer", background: isOpen ? "var(--dirk-l)" : "var(--surface)" }}
                               onMouseEnter={function(e){ if(!isOpen) e.currentTarget.style.background="var(--surface2)"; }}
                               onMouseLeave={function(e){ if(!isOpen) e.currentTarget.style.background="var(--surface)"; }}>
                               <span style={{ fontSize:".65rem", color:"var(--text3)" }}>{isOpen ? "▾" : "▸"}</span>
-                              <span style={{ fontSize:".84rem", fontWeight:500 }}>{post ? post.label : pid}</span>
-                              <span style={{ fontSize:".78rem", color:"var(--text3)", textAlign:"right" }}>{post ? fmt(post.planned) : "-"}</span>
-                              <div style={{ display:"flex", alignItems:"center", gap:4, justifyContent:"flex-end" }}>
-                                <span style={{ fontSize:".82rem", fontWeight:600, color: over ? "var(--red)" : "var(--text)" }}>{fmt(total)}</span>
-                                {over && <span className="badge" style={{ color:"var(--red)", background:"var(--red-l)", border:"1px solid #fecaca" }}>OVER</span>}
+                              <div style={{ minWidth:0 }}>
+                                <span style={{ fontSize:".84rem", fontWeight:500 }}>{post ? post.label : pid}</span>
+                                {over && <span className="badge" style={{ marginLeft:6, color:"var(--red)", background:"var(--red-l)", border:"1px solid #fecaca", fontSize:".62rem" }}>OVER</span>}
                               </div>
+                              <span style={{ fontSize:".78rem", color:"var(--text3)", textAlign:"right" }}>{post ? fmt(post.planned) : "-"}</span>
+                              <span style={{ fontSize:".84rem", fontWeight:600, color: over ? "var(--red)" : "var(--text)", textAlign:"right" }}>{fmt(total)}</span>
                             </div>
                             {isOpen && (
                               <div style={{ background:"var(--surface2)", borderTop:"1px solid var(--border)" }}>
