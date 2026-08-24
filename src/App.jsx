@@ -642,16 +642,20 @@ export default function App() {
   var totSpaar     = allocD + allocS;
   var totSpaarOnly = spaarMonth.filter(function(p){ return p.type !== "beleggen"; }).reduce(function(s,p){ return s+(p.planned||0); }, 0);
   var totBeleg     = spaarMonth.filter(function(p){ return p.type === "beleggen"; }).reduce(function(s,p){ return s+(p.planned||0); }, 0);
-  var totSpaarAct = spaarMonth.reduce(function(s,p){ return s + (p.actual !== null && p.actual !== undefined ? p.actual : (p.planned||0)); }, 0);
+  var totSpaarAct = monthData.spaarActueel != null
+    ? monthData.spaarActueel
+    : spaarMonth.reduce(function(s,p){ return s + (p.actual !== null && p.actual !== undefined ? p.actual : (p.planned||0)); }, 0);
 
   var chartData = useMemo(function() {
     return MONTHS_S.map(function(label, i) {
-      var key   = year+"-"+i;
-      var sp    = data.spaar[key];
+      var key = year+"-"+i;
+      var md  = data.months[key];
+      if (md && md.spaarActueel != null) return { label:label, value:md.spaarActueel, current: i===month };
+      var sp = data.spaar[key];
       var value = sp ? sp.reduce(function(s,p){ return s + (p.actual !== null && p.actual !== undefined ? p.actual : (i < month ? p.planned||0 : 0)); }, 0) : 0;
       return { label:label, value:value, current: i===month };
     });
-  }, [data.spaar, year, month]);
+  }, [data.spaar, data.months, year, month]);
 
   // Import state
   var [importRows,  setImportRows]  = useState([]);
@@ -1352,16 +1356,16 @@ export default function App() {
                         return (
                           <div key={pid} style={{ borderBottom:"1px solid var(--border)" }}>
                             <div onClick={function(){ setExpandedPosts(function(ep){ return Object.assign({},ep,{[pid]:!ep[pid]}); }); }}
-                              style={{ display:"grid", gridTemplateColumns:"20px 1fr 80px 90px", padding:".5rem .85rem", alignItems:"center", cursor:"pointer", background: isOpen ? "var(--dirk-l)" : "var(--surface)" }}
+                              style={{ display:"grid", gridTemplateColumns:"20px 1fr 80px 90px", padding:".65rem .85rem", alignItems:"center", cursor:"pointer", background: isOpen ? "var(--dirk-l)" : "var(--surface)" }}
                               onMouseEnter={function(e){ if(!isOpen) e.currentTarget.style.background="var(--surface2)"; }}
                               onMouseLeave={function(e){ if(!isOpen) e.currentTarget.style.background="var(--surface)"; }}>
                               <span style={{ fontSize:".65rem", color:"var(--text3)" }}>{isOpen ? "▾" : "▸"}</span>
-                              <span style={{ fontSize:".84rem", fontWeight:500 }}>{post ? post.label : pid}</span>
-                              <span style={{ fontSize:".78rem", color:"var(--text3)", textAlign:"right" }}>{post ? fmt(post.planned) : "-"}</span>
-                              <div style={{ display:"flex", alignItems:"center", gap:4, justifyContent:"flex-end" }}>
-                                <span style={{ fontSize:".82rem", fontWeight:600, color: over ? "var(--red)" : "var(--text)" }}>{fmt(total)}</span>
-                                {over && <span className="badge" style={{ color:"var(--red)", background:"var(--red-l)", border:"1px solid #fecaca" }}>OVER</span>}
+                              <div style={{ minWidth:0 }}>
+                                <span style={{ fontSize:".84rem", fontWeight:500 }}>{post ? post.label : pid}</span>
+                                {over && <span className="badge" style={{ marginLeft:6, color:"var(--red)", background:"var(--red-l)", border:"1px solid #fecaca", fontSize:".62rem" }}>OVER</span>}
                               </div>
+                              <span style={{ fontSize:".78rem", color:"var(--text3)", textAlign:"right" }}>{post ? fmt(post.planned) : "-"}</span>
+                              <span style={{ fontSize:".84rem", fontWeight:600, color: over ? "var(--red)" : "var(--text)", textAlign:"right" }}>{fmt(total)}</span>
                             </div>
                             {isOpen && (
                               <div style={{ background:"var(--surface2)", borderTop:"1px solid var(--border)" }}>
@@ -1392,6 +1396,35 @@ export default function App() {
                         );
                       })}
                     </div>
+                    {(function() {
+                      var unknown = importRows.filter(function(r){ return r.include !== false && r.assignedId === "__onbekend__"; });
+                      if (!unknown.length) return null;
+                      return (
+                        <div style={{ marginBottom:".85rem", border:"1px solid #fde68a", borderRadius:"var(--radius-sm)", background:"#fffbeb" }}>
+                          <div style={{ padding:".5rem .85rem", borderBottom:"1px solid #fde68a", fontSize:".78rem", fontWeight:600, color:"#92400e" }}>
+                            {unknown.length} transactie{unknown.length > 1 ? "s" : ""} niet herkend — wijs ze handmatig toe
+                          </div>
+                          {unknown.map(function(r) {
+                            var globalIdx = importRows.findIndex(function(x){ return x.id===r.id; });
+                            return (
+                              <div key={r.id} style={{ display:"flex", alignItems:"center", gap:".5rem", padding:".45rem .85rem", borderBottom:"1px solid #fde68a" }}>
+                                <div style={{ flex:1, minWidth:0 }}>
+                                  <div style={{ fontSize:".79rem", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{r.desc}</div>
+                                  <div style={{ fontSize:".65rem", color:"#92400e" }}>{r.date}</div>
+                                </div>
+                                <select value={r.assignedId}
+                                  onChange={function(e){ var v=e.target.value; setImportRows(function(rs){ return rs.map(function(x,j){ return j===globalIdx?Object.assign({},x,{assignedId:v}):x; }); }); }}
+                                  style={{ border:"1px solid #fcd34d", borderRadius:6, padding:".28rem .4rem", fontSize:".72rem", fontFamily:"inherit", background:"white", maxWidth:130 }}>
+                                  <option value="__onbekend__">Kies post...</option>
+                                  {posts.map(function(p){ return <option key={p.id} value={p.id}>{p.label}</option>; })}
+                                </select>
+                                <span style={{ color:"var(--red)", fontSize:".78rem", fontWeight:500, flexShrink:0 }}>-{fmt(r.amount)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                     <div style={{ display:"flex", gap:".6rem" }}>
                       <button style={ghostBtn} onClick={resetImport}>Annuleren</button>
                       <button style={Object.assign({},primaryBtn,{flex:1})} onClick={applyImport}>Verwerk {importRows.filter(function(r){ return r.include!==false; }).length} transacties</button>
@@ -1444,42 +1477,19 @@ export default function App() {
               })}
 
               <Card className="card-pad" style={{ padding:"1rem 1.1rem" }}>
-                <div className="check-row" style={{ padding:".35rem .4rem", marginBottom:".5rem" }}>
+                <div className="check-row" style={{ padding:".35rem .4rem" }}>
                   <span style={{ fontWeight:600, fontSize:".88rem" }}>Sparen &amp; Beleggen</span>
-                  <span style={{ textAlign:"right", fontSize:".84rem", color:"var(--text2)", fontWeight:500 }}>{fmt(totSpaar)}</span>
-                  <span style={{ textAlign:"right", fontSize:".84rem", fontWeight:600 }}>{fmt(totSpaarAct)}</span>
-                  <div style={{ display:"flex", justifyContent:"flex-end" }}><DiffBadge planned={totSpaar} actual={totSpaarAct}/></div>
-                </div>
-                <button
-                  onClick={function() {
-                    saveSpaar(spaarMonth.map(function(p){ return Object.assign({},p,{actual:p.planned}); }));
-                    notify("Alles gespaard!");
-                  }}
-                  style={{ width:"100%", padding:".55rem", borderRadius:"var(--radius-sm)", border:"1px solid #bbf7d0", background:"var(--green-l)", color:"#16a34a", fontWeight:600, fontSize:".85rem", cursor:"pointer", fontFamily:"inherit", marginBottom:".6rem" }}
-                >
-                  ✓ Alles gespaard
-                </button>
-                <details>
-                  <summary style={{ fontSize:".78rem", color:"var(--text3)", cursor:"pointer", userSelect:"none", marginBottom:".35rem" }}>Uitzonderingen invoeren</summary>
-                  <div style={{ borderTop:"1px solid var(--border)", marginTop:".35rem", paddingTop:".35rem" }}>
-                    {spaarMonth.map(function(p) {
-                      var u = USERS.find(function(u){ return u.id===p.owner; });
-                      return (
-                        <div key={p.id} className="check-row row-hover" style={{ padding:".3rem .4rem" }}>
-                          <div style={{ display:"flex", alignItems:"center", gap:".4rem" }}>
-                            <span style={{ fontSize:".82rem", color:"var(--text2)" }}>{p.label}</span>
-                            {u && <span className="pill" style={{ color:u.color, background:u.light, border:"1px solid "+u.border }}>{u.name[0]}</span>}
-                          </div>
-                          <span style={{ textAlign:"right", fontSize:".8rem", color:"var(--text3)" }}>{fmt(p.planned)}</span>
-                          <div style={{ display:"flex", justifyContent:"flex-end" }}>
-                            <DecInput value={p.actual} onCommit={function(v){ updateSpaar(p.id,"actual",v); }} placeholder={String((p.planned||0).toFixed(0))} style={inpRight}/>
-                          </div>
-                          <div className="diff-col" style={{ display:"flex", justifyContent:"flex-end" }}><DiffBadge planned={p.planned} actual={p.actual}/></div>
-                        </div>
-                      );
-                    })}
+                  <span style={{ textAlign:"right", fontSize:".8rem", color:"var(--text3)" }}>{fmt(totSpaar)}</span>
+                  <div style={{ display:"flex", justifyContent:"flex-end" }}>
+                    <DecInput
+                      value={monthData.spaarActueel != null ? monthData.spaarActueel : null}
+                      onCommit={function(v){ saveMonthData(Object.assign({}, monthData, { spaarActueel: v })); }}
+                      placeholder={String(totSpaar.toFixed(0))}
+                      style={inpRight}
+                    />
                   </div>
-                </details>
+                  <div className="diff-col" style={{ display:"flex", justifyContent:"flex-end" }}><DiffBadge planned={totSpaar} actual={monthData.spaarActueel != null ? monthData.spaarActueel : null}/></div>
+                </div>
               </Card>
 
               <Card style={{ background:"var(--text)", border:"none", padding:"1rem 1.25rem" }}>
