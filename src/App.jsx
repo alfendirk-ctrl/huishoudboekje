@@ -510,8 +510,9 @@ export default function App() {
     };
   }, [mk, data.months]);
 
-  var posts   = monthData.posts   || [];
-  var actuals = monthData.actuals || {};
+  var posts      = monthData.posts      || [];
+  var actuals    = monthData.actuals    || {};
+  var txByPost   = monthData.txByPost   || {};
 
   function saveMonthData(md) {
     setData(function(d) {
@@ -664,6 +665,8 @@ export default function App() {
   var [importAcct,  setImportAcct]  = useState("samen");
   var [csvError,    setCsvError]    = useState("");
   var [aiMsg,       setAiMsg]       = useState("");
+  var [openTxPost,  setOpenTxPost]  = useState(null);
+  var [clearConfirm,setClearConfirm]= useState(false);
   var fileRef = useRef();
 
   var importSummary = useMemo(function() {
@@ -777,7 +780,12 @@ export default function App() {
       if (pid === "__overige__") return;
       newActuals[pid] = (newActuals[pid]||0) + total;
     });
-    saveMonthData(Object.assign({}, monthData, { actuals: newActuals }));
+    var newTxByPost = Object.assign({}, monthData.txByPost || {});
+    importRows.filter(function(r){ return r.include !== false && r.assignedId !== "__onbekend__" && r.assignedId !== "__overige__"; }).forEach(function(r) {
+      if (!newTxByPost[r.assignedId]) newTxByPost[r.assignedId] = [];
+      newTxByPost[r.assignedId] = newTxByPost[r.assignedId].concat([{ date:r.date, desc:r.desc, amount:r.amount }]);
+    });
+    saveMonthData(Object.assign({}, monthData, { actuals: newActuals, txByPost: newTxByPost }));
 
     // Learn from confirmed assignments (only non-unknown, non-overige, non-memory ones)
     var newMemory = Object.assign({}, memory);
@@ -1444,7 +1452,17 @@ export default function App() {
               </Card>
 
               {/* Manual check */}
-              <div style={{ fontSize:".82rem", fontWeight:600, color:"var(--text2)", marginBottom:".6rem" }}>Handmatig invullen of corrigeren</div>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:".6rem" }}>
+                <div style={{ fontSize:".82rem", fontWeight:600, color:"var(--text2)" }}>Handmatig invullen of corrigeren</div>
+                {clearConfirm
+                  ? <div style={{ display:"flex", gap:".4rem" }}>
+                      <span style={{ fontSize:".78rem", color:"var(--text3)" }}>Zeker?</span>
+                      <button style={ghostBtn} onClick={function(){ setClearConfirm(false); }}>Nee</button>
+                      <button style={Object.assign({},ghostBtn,{color:"var(--red)"})} onClick={function(){ saveMonthData(Object.assign({},monthData,{actuals:{},txByPost:{},spaarActueel:null})); setClearConfirm(false); setOpenTxPost(null); }}>Ja, legen</button>
+                    </div>
+                  : <button style={ghostBtn} onClick={function(){ setClearConfirm(true); }}>Alles legen</button>
+                }
+              </div>
               <div className="check-head" style={{ padding:"0 .5rem", marginBottom:".3rem" }}>
                 {["","Gepland","Werkelijk","Verschil"].map(function(h,i){ return <div key={i} className={i===3?"diff-col":""} style={Object.assign({},colHead,{textAlign:i===0?"left":"right"})}>{h.toUpperCase()}</div>; })}
               </div>
@@ -1464,14 +1482,35 @@ export default function App() {
                     <div style={{ borderTop:"1px solid var(--border)", marginBottom:".35rem" }}/>
                     {gPosts.map(function(post) {
                       var act = actuals[post.id];
+                      var txList = txByPost[post.id] || [];
+                      var txOpen = openTxPost === post.id;
                       return (
-                        <div key={post.id} className="row-hover" className="check-row row-hover" style={{ padding:".3rem .4rem" }}>
-                          <span style={{ fontSize:".82rem", color:"var(--text2)" }}>{post.label}</span>
-                          <span style={{ textAlign:"right", fontSize:".8rem", color:"var(--text3)" }}>{fmt(post.planned)}</span>
-                          <div style={{ display:"flex", justifyContent:"flex-end" }}>
-                            <DecInput value={act} onCommit={function(v){ setActual(post.id,v); }} placeholder={String((post.planned||0).toFixed(0))} style={inpRight}/>
+                        <div key={post.id}>
+                          <div className="row-hover" className="check-row row-hover" style={{ padding:".3rem .4rem" }}>
+                            <span style={{ fontSize:".82rem", color:"var(--text2)" }}>{post.label}</span>
+                            <span style={{ textAlign:"right", fontSize:".8rem", color:"var(--text3)" }}>{fmt(post.planned)}</span>
+                            <div style={{ display:"flex", justifyContent:"flex-end" }}>
+                              <DecInput value={act} onCommit={function(v){ setActual(post.id,v); }} placeholder={String((post.planned||0).toFixed(0))} style={inpRight}/>
+                            </div>
+                            <div className="diff-col" style={{ display:"flex", justifyContent:"flex-end", cursor: txList.length ? "pointer" : "default" }}
+                              onClick={function(){ if (txList.length) setOpenTxPost(txOpen ? null : post.id); }}
+                              title={txList.length ? "Klik voor transacties" : ""}>
+                              <DiffBadge planned={post.planned} actual={act}/>
+                            </div>
                           </div>
-                          <div className="diff-col" style={{ display:"flex", justifyContent:"flex-end" }}><DiffBadge planned={post.planned} actual={act}/></div>
+                          {txOpen && (
+                            <div style={{ background:"var(--surface2)", borderRadius:"var(--radius-sm)", padding:".35rem .5rem .35rem 1rem", marginBottom:".15rem" }}>
+                              {txList.map(function(tx, i) {
+                                return (
+                                  <div key={i} style={{ display:"flex", gap:".5rem", fontSize:".72rem", padding:".15rem 0", color:"var(--text2)", alignItems:"baseline" }}>
+                                    <span style={{ color:"var(--text3)", flexShrink:0 }}>{tx.date}</span>
+                                    <span style={{ flex:1, minWidth:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{tx.desc}</span>
+                                    <span style={{ fontWeight:500, flexShrink:0 }}>-{fmt(tx.amount)}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
