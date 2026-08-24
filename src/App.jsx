@@ -121,6 +121,13 @@ function repairSpaarData(data) {
       if (result.label === "Spaarrekening" && result.type === "sparen") result.type = "eigen";
       return result;
     });
+    // Add any DEFAULT_SPAAR items missing from this month (e.g. newly added kinderopvang)
+    DEFAULT_SPAAR.forEach(function(def) {
+      if (!fixed.find(function(p){ return p.id === def.id; })) {
+        fixed = fixed.concat([Object.assign({}, def, { actual: null })]);
+        changed = true;
+      }
+    });
     newSpaar[mk] = fixed;
   });
   if (!changed) return data;
@@ -625,7 +632,7 @@ export default function App() {
         ? prev.map(function(p){ return Object.assign({},p,{actual:null}); })
         : DEFAULT_SPAAR.map(function(p){ return Object.assign({},p,{actual:null}); });
     }
-    return raw.map(function(p) {
+    var repaired = raw.map(function(p) {
       if (p.label != null && p.owner != null && p.type != null) return p;
       var def = DEFAULT_SPAAR.find(function(d){ return d.id === p.id; });
       return Object.assign({}, p, {
@@ -634,6 +641,12 @@ export default function App() {
         type:  p.type  != null ? p.type  : (def ? def.type  : "sparen"),
       });
     });
+    DEFAULT_SPAAR.forEach(function(def) {
+      if (!repaired.find(function(p){ return p.id === def.id; })) {
+        repaired = repaired.concat([Object.assign({}, def, { actual: null })]);
+      }
+    });
+    return repaired;
   }, [mk, data.spaar]);
 
   function saveSpaar(arr) {
@@ -1152,7 +1165,7 @@ export default function App() {
                   <span style={{ fontSize:".82rem", fontWeight:600, color:DIRK.color }}>{fmt(totSpaarOnly + kinderopvangPlan)}</span>
                 </div>
                 <div className="spaar-row" style={{ paddingBottom:".4rem", borderBottom:"1px solid var(--border)", marginBottom:".5rem" }}>
-                  {["Naam","Persoon","Bedrag","Sectie",""].map(function(h,i){ return <span key={i} style={Object.assign({},colHead,{textAlign:i===2?"right":"left"})}>{h.toUpperCase()}</span>; })}
+                  {["Naam","Persoon","Bedrag",""].map(function(h,i){ return <span key={i} style={Object.assign({},colHead,{textAlign:i===2?"right":"left"})}>{h.toUpperCase()}</span>; })}
                 </div>
                 {spaarMonth.filter(function(p){ return p.type === "sparen" || p.type === "kinderopvang"; }).map(function(p) {
                   var u = p.owner === "samen" ? null : USERS.find(function(u){ return u.id===p.owner; });
