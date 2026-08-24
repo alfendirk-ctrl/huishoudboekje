@@ -407,9 +407,9 @@ function BarChart({ data }) {
         return (
           <div key={d.label} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:3 }}>
             {d.value > 0 && <span style={{ fontSize:".58rem", color:"var(--text3)", transform:"rotate(-30deg)", whiteSpace:"nowrap" }}>{fmt(d.value).replace("€","").replace("•••","•••")}</span>}
-            <div style={{ width:"100%", height:100, display:"flex", alignItems:"flex-end", gap:2 }}>
-              <div title="Gepland" style={{ flex:1, height:hPlan+"%", background:"var(--surface2)", border:"1px solid var(--border)", borderRadius:"3px 3px 0 0", transition:"height .4s ease", boxSizing:"border-box", minHeight: hPlan > 0 ? 2 : 0 }}/>
-              <div title="Gelukt" style={{ flex:1, height:hAct+"%", background:col, borderRadius:"3px 3px 0 0", boxShadow:bdr, transition:"height .4s ease", minHeight: hAct > 0 ? 2 : 0 }}/>
+            <div style={{ width:"100%", height:100, position:"relative" }}>
+              <div title="Gepland" style={{ position:"absolute", bottom:0, left:0, right:0, height:hPlan+"%", background:"var(--surface2)", border:"1px solid var(--border)", borderRadius:"3px 3px 0 0", transition:"height .4s ease", boxSizing:"border-box" }}/>
+              <div title="Gelukt" style={{ position:"absolute", bottom:0, left:0, right:0, height:hAct+"%", background:col, borderRadius:"3px 3px 0 0", boxShadow:bdr, transition:"height .4s ease", opacity:.85 }}/>
             </div>
             <span style={{ fontSize:".65rem", color: d.current ? "var(--dirk)" : "var(--text3)", fontWeight: d.current ? 600 : 400 }}>{d.label}</span>
           </div>
