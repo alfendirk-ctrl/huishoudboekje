@@ -2,11 +2,14 @@ import React, { useState, useMemo, useEffect, useRef } from 'react'
 
 import { dbLoad, dbSave } from './db.js'
 
-const SHARED_KEY = "hhb_shared_v1"
 const MEMORY_KEY = "hhb_memory_v1"
 
-async function loadShared(def) { return dbLoad(SHARED_KEY, def) }
-async function saveShared(data) { return dbSave(SHARED_KEY, data) }
+// Sync code — stored in localStorage, used as Supabase storage key
+var _syncCode = { v: (function(){ try { return localStorage.getItem("hhb_sync_code") || "hhb_shared_v1"; } catch { return "hhb_shared_v1"; } })() };
+function setSyncCodeLS(c) { _syncCode.v = c; try { localStorage.setItem("hhb_sync_code", c); } catch {} }
+
+async function loadShared(def) { return dbLoad(_syncCode.v, def) }
+async function saveShared(data) { return dbSave(_syncCode.v, data) }
 async function loadMemory() { return dbLoad(MEMORY_KEY, {}) }
 async function saveMemory(mem) { return dbSave(MEMORY_KEY, mem) }
 
@@ -438,6 +441,8 @@ export default function App() {
   var [tab,   setTab]     = useState("plan");
   var [notif, setNotif]   = useState("");
   var [privacyMode, setPrivacyMode] = useState(false);
+  var [syncModal, setSyncModal]     = useState(false);
+  var [syncInput, setSyncInput]     = useState("");
   var [syncing, setSyncing]   = useState(false);
   var [lastSync, setLastSync] = useState(null);
   var [data, setDataRaw]      = useState(DEFAULT_DATA);
@@ -509,6 +514,24 @@ export default function App() {
     if (r) { isPullDataRef.current = true; setDataRaw(r); }
     setSyncing(false);
     setLastSync(new Date());
+  }
+
+  async function applySyncCode(code) {
+    var clean = code.trim();
+    if (!clean) return;
+    setSyncCodeLS(clean);
+    setSyncing(true);
+    var r = await loadShared(DEFAULT_DATA);
+    var rep = repairSpaarData(r);
+    isPullDataRef.current = true;
+    setDataRaw(rep);
+    var mem = await loadMemory();
+    setMemory(mem || {});
+    setSyncing(false);
+    setLastSync(new Date());
+    setSyncModal(false);
+    setSyncInput("");
+    notify("Gekoppeld");
   }
 
   async function forcePush() {
@@ -922,6 +945,29 @@ export default function App() {
           </div>
         )}
 
+        {syncModal && (
+          <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.45)", zIndex:9998, display:"flex", alignItems:"center", justifyContent:"center", padding:"1rem" }} onClick={function(e){ if(e.target===e.currentTarget) setSyncModal(false); }}>
+            <div style={{ background:"var(--surface)", borderRadius:"var(--radius)", boxShadow:"var(--shadow-md)", maxWidth:420, width:"100%", padding:"1.5rem" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"1.25rem" }}>
+                <span style={{ fontWeight:700, fontSize:"1rem" }}>Sync code</span>
+                <button onClick={function(){ setSyncModal(false); }} style={{ background:"none", border:"none", fontSize:"1.2rem", cursor:"pointer", color:"var(--text3)", lineHeight:1 }}>✕</button>
+              </div>
+
+              <div style={{ fontSize:".82rem", color:"var(--text2)", marginBottom:".75rem" }}>Jouw huidige code — kopieer deze en voer hem in op een ander apparaat.</div>
+              <div style={{ display:"flex", gap:".5rem", marginBottom:"1.5rem" }}>
+                <input readOnly value={_syncCode.v} style={{ flex:1, fontFamily:"monospace", fontSize:".8rem", background:"var(--surface2)", border:"1px solid var(--border)", borderRadius:6, padding:".45rem .6rem", color:"var(--text)" }}/>
+                <button onClick={function(){ try { navigator.clipboard.writeText(_syncCode.v); notify("Gekopieerd"); } catch {} }} style={{ background:"var(--dirk-l)", color:"var(--dirk)", border:"1px solid var(--dirk-b)", borderRadius:6, cursor:"pointer", padding:".45rem .9rem", fontSize:".82rem", fontFamily:"inherit", fontWeight:600 }}>Kopieer</button>
+              </div>
+
+              <div style={{ fontSize:".82rem", color:"var(--text2)", marginBottom:".5rem" }}>Code van ander apparaat invoeren:</div>
+              <div style={{ display:"flex", gap:".5rem" }}>
+                <input value={syncInput} onChange={function(e){ setSyncInput(e.target.value); }} placeholder="Plak hier de sync code" style={{ flex:1, fontFamily:"monospace", fontSize:".8rem", background:"var(--surface2)", border:"1px solid var(--border)", borderRadius:6, padding:".45rem .6rem", color:"var(--text)" }}/>
+                <button onClick={function(){ applySyncCode(syncInput); }} disabled={!syncInput.trim()} style={{ background:"var(--dirk)", color:"white", border:"none", borderRadius:6, cursor:"pointer", padding:".45rem .9rem", fontSize:".82rem", fontFamily:"inherit", fontWeight:600, opacity: syncInput.trim() ? 1 : .45 }}>Koppelen</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {reviewPopup && (
           <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.45)", zIndex:9998, display:"flex", alignItems:"center", justifyContent:"center", padding:"1rem" }}>
             <div style={{ background:"var(--surface)", borderRadius:"var(--radius)", boxShadow:"var(--shadow-md)", maxWidth:500, width:"100%", maxHeight:"85vh", overflowY:"auto", padding:"1.5rem" }}>
@@ -995,6 +1041,9 @@ export default function App() {
               <div style={{ display:"flex", alignItems:"center", gap:".75rem" }}>
                 <button onClick={function(){ setPrivacyMode(function(p){ return !p; }); }} title={privacyMode ? "Bedragen tonen" : "Bedragen verbergen"} style={{ fontSize:".75rem", color: privacyMode ? "var(--dirk)" : "var(--text3)", background: privacyMode ? "var(--dirk-l)" : "none", border: privacyMode ? "1px solid var(--dirk-b)" : "1px solid var(--border)", cursor:"pointer", padding:"2px 8px", borderRadius:6, fontFamily:"inherit", WebkitTapHighlightColor:"transparent", fontWeight: privacyMode ? 600 : 400 }}>
                   {privacyMode ? "Verborgen" : "Verbergen"}
+                </button>
+                <button onClick={function(){ setSyncModal(true); setSyncInput(""); }} title="Sync code" style={{ fontSize:".75rem", color:"var(--text3)", background:"none", border:"1px solid var(--border)", cursor:"pointer", padding:"2px 8px", borderRadius:6, fontFamily:"inherit", WebkitTapHighlightColor:"transparent" }}>
+                  Sync
                 </button>
                 <button onClick={manualSync} title="Ophalen uit cloud" style={{ display:"flex", alignItems:"center", gap:".4rem", fontSize:".75rem", color:"var(--text3)", background:"none", border:"none", cursor:"pointer", padding:"2px 4px", borderRadius:6, fontFamily:"inherit", WebkitTapHighlightColor:"transparent" }}>
                   <div style={{ width:8, height:8, borderRadius:"50%", background: syncing ? "var(--orange)" : "var(--green)", flexShrink:0 }}/>
