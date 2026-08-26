@@ -1038,16 +1038,15 @@ export default function App() {
                 <h1 style={{ fontFamily:"Fraunces,serif", fontWeight:600, fontSize:"1.4rem", letterSpacing:"-.01em" }}>Huishoudboekje</h1>
                 <span style={{ fontFamily:"Fraunces,serif", fontStyle:"italic", fontWeight:300, fontSize:".95rem", color:"var(--text2)" }}>Dirk &amp; Shelley</span>
               </div>
-              <div style={{ display:"flex", alignItems:"center", gap:".75rem" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:".5rem", flexWrap:"wrap", justifyContent:"flex-end" }}>
                 <button onClick={function(){ setPrivacyMode(function(p){ return !p; }); }} title={privacyMode ? "Bedragen tonen" : "Bedragen verbergen"} style={{ fontSize:".75rem", color: privacyMode ? "var(--dirk)" : "var(--text3)", background: privacyMode ? "var(--dirk-l)" : "none", border: privacyMode ? "1px solid var(--dirk-b)" : "1px solid var(--border)", cursor:"pointer", padding:"2px 8px", borderRadius:6, fontFamily:"inherit", WebkitTapHighlightColor:"transparent", fontWeight: privacyMode ? 600 : 400 }}>
                   {privacyMode ? "Verborgen" : "Verbergen"}
                 </button>
                 <button onClick={function(){ setSyncModal(true); setSyncInput(""); }} title="Sync code" style={{ fontSize:".75rem", color:"var(--text3)", background:"none", border:"1px solid var(--border)", cursor:"pointer", padding:"2px 8px", borderRadius:6, fontFamily:"inherit", WebkitTapHighlightColor:"transparent" }}>
                   Sync
                 </button>
-                <button onClick={manualSync} title="Ophalen uit cloud" style={{ display:"flex", alignItems:"center", gap:".4rem", fontSize:".75rem", color:"var(--text3)", background:"none", border:"none", cursor:"pointer", padding:"2px 4px", borderRadius:6, fontFamily:"inherit", WebkitTapHighlightColor:"transparent" }}>
-                  <div style={{ width:8, height:8, borderRadius:"50%", background: syncing ? "var(--orange)" : "var(--green)", flexShrink:0 }}/>
-                  {syncing ? "Bezig..." : lastSync ? "Gesynchroniseerd" : "Gedeeld"}
+                <button onClick={manualSync} title={syncing ? "Bezig..." : lastSync ? "Gesynchroniseerd" : "Ophalen uit cloud"} style={{ display:"flex", alignItems:"center", background:"none", border:"none", cursor:"pointer", padding:"4px", borderRadius:6, WebkitTapHighlightColor:"transparent" }}>
+                  <div style={{ width:9, height:9, borderRadius:"50%", background: syncing ? "var(--orange)" : "var(--green)" }}/>
                 </button>
                 <span className="badge" style={{ color:DIRK.color,    background:DIRK.light,    border:"1px solid "+DIRK.border    }}>D {Math.round(ratioD*100)}%</span>
                 <span className="badge" style={{ color:SHELLEY.color, background:SHELLEY.light, border:"1px solid "+SHELLEY.border }}>S {Math.round(ratioS*100)}%</span>
