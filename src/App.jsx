@@ -1687,7 +1687,7 @@ export default function App() {
                       var txOpen = openTxPost === post.id;
                       return (
                         <div key={post.id}>
-                          <div className="row-hover" className="check-row row-hover" style={{ padding:".3rem .4rem" }}>
+                          <div className="check-row row-hover" style={{ padding:".3rem .4rem" }}>
                             <span style={{ fontSize:".82rem", color:"var(--text2)" }}>{post.label}</span>
                             <span style={{ textAlign:"right", fontSize:".8rem", color:"var(--text3)" }}>{fmt(post.planned)}</span>
                             <div style={{ display:"flex", justifyContent:"flex-end" }}>
