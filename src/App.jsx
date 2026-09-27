@@ -1391,28 +1391,13 @@ export default function App() {
 
               <Card>
                 <Sec>Spaardoel - 1.000 / maand</Sec>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 72px 80px", gap:"0 .5rem", alignItems:"center", marginBottom:".3rem" }}>
-                  <span style={{ fontSize:".75rem", color:"var(--text3)", fontWeight:600, letterSpacing:".08em", textTransform:"uppercase" }}></span>
-                  <span style={{ fontSize:".72rem", color:"var(--text3)", textAlign:"right" }}>GEPLAND</span>
-                  <span style={{ fontSize:".72rem", color:"var(--text3)", textAlign:"right" }}>ACTUEEL</span>
-                </div>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 72px 80px", gap:"0 .5rem", alignItems:"center", marginBottom:".4rem" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:".4rem" }}>
                   <span style={{ fontSize:".82rem", color:"var(--text2)" }}>Sparen &amp; buffer</span>
-                  <span style={{ fontWeight:600, color:DIRK.color, textAlign:"right", fontSize:".82rem" }}>{fmt(totSpaarOnly + kinderopvangPlan)}</span>
-                  <div style={{ display:"flex", justifyContent:"flex-end" }}>
-                    <DecInput value={monthData.spaarActueel != null ? monthData.spaarActueel : null}
-                      onCommit={function(v){ saveMonthData(Object.assign({}, monthData, { spaarActueel: v })); }}
-                      placeholder={String((totSpaarOnly + kinderopvangPlan).toFixed(0))} style={inpRight}/>
-                  </div>
+                  <span style={{ fontWeight:600, color:DIRK.color, fontSize:".82rem" }}>{fmt(totSpaarOnly + kinderopvangPlan)}</span>
                 </div>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 72px 80px", gap:"0 .5rem", alignItems:"center", marginBottom:".5rem" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:".5rem" }}>
                   <span style={{ fontSize:".82rem", color:"var(--text2)" }}>Beleggen</span>
-                  <span style={{ fontWeight:600, color:"#7c3aed", textAlign:"right", fontSize:".82rem" }}>{fmt(totBeleg)}</span>
-                  <div style={{ display:"flex", justifyContent:"flex-end" }}>
-                    <DecInput value={monthData.belegActueel != null ? monthData.belegActueel : null}
-                      onCommit={function(v){ saveMonthData(Object.assign({}, monthData, { belegActueel: v })); }}
-                      placeholder={String(totBeleg.toFixed(0))} style={inpRight}/>
-                  </div>
+                  <span style={{ fontWeight:600, color:"#7c3aed", fontSize:".82rem" }}>{fmt(totBeleg)}</span>
                 </div>
                 <div style={{ borderTop:"1px solid var(--border)", paddingTop:".4rem", display:"flex", justifyContent:"space-between", marginBottom:".5rem" }}>
                   <span style={{ fontSize:".84rem", color:"var(--text2)" }}>Totaal</span>
