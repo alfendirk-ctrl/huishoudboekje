@@ -511,7 +511,14 @@ export default function App() {
   async function manualSync() {
     setSyncing(true);
     var r = await loadShared(null);
-    if (r) { isPullDataRef.current = true; setDataRaw(r); }
+    if (r) {
+      isPullDataRef.current = true;
+      setDataRaw(r);
+    } else {
+      // Supabase is empty — push local data up so other devices can sync
+      await saveShared(data);
+      notify("Lokale data geüpload naar cloud");
+    }
     setSyncing(false);
     setLastSync(new Date());
   }
@@ -1045,8 +1052,9 @@ export default function App() {
                 <button onClick={function(){ setSyncModal(true); setSyncInput(""); }} title="Sync code" style={{ fontSize:".75rem", color:"var(--text3)", background:"none", border:"1px solid var(--border)", cursor:"pointer", padding:"2px 8px", borderRadius:6, fontFamily:"inherit", WebkitTapHighlightColor:"transparent" }}>
                   Sync
                 </button>
-                <button onClick={manualSync} title={syncing ? "Bezig..." : lastSync ? "Gesynchroniseerd" : "Ophalen uit cloud"} style={{ display:"flex", alignItems:"center", background:"none", border:"none", cursor:"pointer", padding:"4px", borderRadius:6, WebkitTapHighlightColor:"transparent" }}>
-                  <div style={{ width:9, height:9, borderRadius:"50%", background: syncing ? "var(--orange)" : "var(--green)" }}/>
+                <button onClick={manualSync} title={syncing ? "Bezig..." : lastSync ? "Gesynchroniseerd" : "Ophalen uit cloud"} style={{ display:"flex", alignItems:"center", gap:5, fontSize:".75rem", color:"var(--text3)", background:"none", border:"1px solid var(--border)", cursor:"pointer", padding:"2px 8px", borderRadius:6, fontFamily:"inherit", WebkitTapHighlightColor:"transparent" }}>
+                  <div style={{ width:7, height:7, borderRadius:"50%", background: syncing ? "var(--orange)" : "var(--green)", flexShrink:0 }}/>
+                  {syncing ? "Sync..." : "Nu sync"}
                 </button>
                 <span className="badge" style={{ color:DIRK.color,    background:DIRK.light,    border:"1px solid "+DIRK.border    }}>D {Math.round(ratioD*100)}%</span>
                 <span className="badge" style={{ color:SHELLEY.color, background:SHELLEY.light, border:"1px solid "+SHELLEY.border }}>S {Math.round(ratioS*100)}%</span>
