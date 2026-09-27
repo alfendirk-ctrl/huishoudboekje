@@ -741,7 +741,7 @@ export default function App() {
   var kinderopvangPlan = kinderopvangPost ? (kinderopvangPost.planned || 0) : 0;
   var totSpaarActOnly = monthData.spaarActueel != null
     ? monthData.spaarActueel
-    : spaarMonth.filter(function(p){ return p.type === "sparen"; }).reduce(function(s,p){ return s + (p.actual !== null && p.actual !== undefined ? p.actual : (p.planned||0)); }, 0);
+    : totSpaarOnly + kinderopvangPlan;
   var totBelegAct = monthData.belegActueel != null
     ? monthData.belegActueel
     : spaarMonth.filter(function(p){ return p.type === "beleggen"; }).reduce(function(s,p){ return s + (p.actual !== null && p.actual !== undefined ? p.actual : (p.planned||0)); }, 0);
@@ -1398,11 +1398,11 @@ export default function App() {
                 </div>
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 72px 80px", gap:"0 .5rem", alignItems:"center", marginBottom:".4rem" }}>
                   <span style={{ fontSize:".82rem", color:"var(--text2)" }}>Sparen &amp; buffer</span>
-                  <span style={{ fontWeight:600, color:DIRK.color, textAlign:"right", fontSize:".82rem" }}>{fmt(totSpaarOnly)}</span>
+                  <span style={{ fontWeight:600, color:DIRK.color, textAlign:"right", fontSize:".82rem" }}>{fmt(totSpaarOnly + kinderopvangPlan)}</span>
                   <div style={{ display:"flex", justifyContent:"flex-end" }}>
                     <DecInput value={monthData.spaarActueel != null ? monthData.spaarActueel : null}
                       onCommit={function(v){ saveMonthData(Object.assign({}, monthData, { spaarActueel: v })); }}
-                      placeholder={String(totSpaarOnly.toFixed(0))} style={inpRight}/>
+                      placeholder={String((totSpaarOnly + kinderopvangPlan).toFixed(0))} style={inpRight}/>
                   </div>
                 </div>
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 72px 80px", gap:"0 .5rem", alignItems:"center", marginBottom:".5rem" }}>
@@ -1659,7 +1659,7 @@ export default function App() {
                   ? <div style={{ display:"flex", gap:".4rem" }}>
                       <span style={{ fontSize:".78rem", color:"var(--text3)" }}>Zeker?</span>
                       <button style={ghostBtn} onClick={function(){ setClearConfirm(false); }}>Nee</button>
-                      <button style={Object.assign({},ghostBtn,{color:"var(--red)"})} onClick={function(){ saveMonthData(Object.assign({},monthData,{actuals:{},txByPost:{},spaarActueel:null,belegActueel:null})); setClearConfirm(false); setOpenTxPost(null); }}>Ja, legen</button>
+                      <button style={Object.assign({},ghostBtn,{color:"var(--red)"})} onClick={function(){ saveMonthData(Object.assign({},monthData,{actuals:{},txByPost:{},spaarActueel:null,belegActueel:null,kinderopvangActueel:null})); setClearConfirm(false); setOpenTxPost(null); }}>Ja, legen</button>
                     </div>
                   : <button style={ghostBtn} onClick={function(){ setClearConfirm(true); }}>Alles legen</button>
                 }
@@ -1721,43 +1721,18 @@ export default function App() {
 
               <Card className="card-pad" style={{ padding:"1rem 1.1rem" }}>
                 <div className="check-row" style={{ padding:".35rem .4rem" }}>
-                  <span style={{ fontWeight:600, fontSize:".88rem" }}>Sparen</span>
-                  <span style={{ textAlign:"right", fontSize:".8rem", color:"var(--text3)" }}>{fmt(totSpaarOnly)}</span>
+                  <span style={{ fontWeight:600, fontSize:".88rem" }}>Totaal gespaard</span>
+                  <span style={{ textAlign:"right", fontSize:".8rem", color:"var(--text3)" }}>{fmt(totSpaarOnly + kinderopvangPlan)}</span>
                   <div style={{ display:"flex", justifyContent:"flex-end" }}>
                     <DecInput
                       value={monthData.spaarActueel != null ? monthData.spaarActueel : null}
                       onCommit={function(v){ saveMonthData(Object.assign({}, monthData, { spaarActueel: v })); }}
-                      placeholder={String(totSpaarOnly.toFixed(0))}
+                      placeholder={String((totSpaarOnly + kinderopvangPlan).toFixed(0))}
                       style={inpRight}
                     />
                   </div>
-                  <div className="diff-col" style={{ display:"flex", justifyContent:"flex-end" }}><DiffBadge planned={totSpaarOnly} actual={monthData.spaarActueel != null ? monthData.spaarActueel : null} invert/></div>
+                  <div className="diff-col" style={{ display:"flex", justifyContent:"flex-end" }}><DiffBadge planned={totSpaarOnly + kinderopvangPlan} actual={monthData.spaarActueel != null ? monthData.spaarActueel : null} invert/></div>
                 </div>
-                {kinderopvangPost && (
-                  <div className="check-row" style={{ padding:".35rem .4rem", borderTop:"1px solid var(--border)", marginTop:".35rem" }}>
-                    <span style={{ fontSize:".88rem", color:"var(--text2)" }}>Kinderopvang</span>
-                    <span style={{ textAlign:"right", fontSize:".8rem", color:"var(--text3)" }}>{fmt(kinderopvangPlan)}</span>
-                    <div style={{ display:"flex", justifyContent:"flex-end" }}>
-                      <DecInput
-                        value={kinderopvangAct}
-                        onCommit={function(v){ saveMonthData(Object.assign({}, monthData, { kinderopvangActueel: v })); }}
-                        placeholder={String(kinderopvangPlan.toFixed(0))}
-                        style={inpRight}
-                      />
-                    </div>
-                    <div className="diff-col" style={{ display:"flex", justifyContent:"flex-end" }}><DiffBadge planned={kinderopvangPlan} actual={kinderopvangAct} invert/></div>
-                  </div>
-                )}
-                {kinderopvangPost && (
-                  <div className="check-row" style={{ padding:".35rem .4rem", borderTop:"1px solid var(--border)", marginTop:".35rem" }}>
-                    <span style={{ fontWeight:600, fontSize:".85rem", color:"var(--text2)" }}>Totaal gespaard</span>
-                    <span/>
-                    <div style={{ textAlign:"right", fontSize:".88rem", fontWeight:600 }}>
-                      {fmt((monthData.spaarActueel != null ? monthData.spaarActueel : totSpaarOnly) + (kinderopvangAct != null ? kinderopvangAct : kinderopvangPlan))}
-                    </div>
-                    <div/>
-                  </div>
-                )}
               </Card>
 
               <Card style={{ background:"var(--text)", border:"none", padding:"1rem 1.25rem" }}>
