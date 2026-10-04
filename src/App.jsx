@@ -1208,20 +1208,20 @@ export default function App() {
             <div>
               {/* Beginstand spaargeld */}
               <Card style={{ marginBottom:"1rem" }}>
-                <Sec>Beginstand spaargeld</Sec>
+                <Sec>Spaarsaldo</Sec>
                 <div style={{ display:"flex", flexDirection:"column", gap:".6rem" }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                    <span style={{ fontSize:".84rem", color:"var(--text2)" }}>Beginstand</span>
+                    <span style={{ fontSize:".84rem", color:"var(--text2)" }}>Huidig saldo</span>
                     <DecInput
                       value={monthData.spaarBegin != null ? monthData.spaarBegin : null}
                       onCommit={function(v){ saveMonthData(Object.assign({}, monthData, { spaarBegin: v })); }}
-                      placeholder="0"
-                      style={{ textAlign:"right", width:"7rem", fontSize:".88rem", fontWeight:600 }}
+                      placeholder="Voer in..."
+                      style={{ textAlign:"right", width:"9rem", fontSize:".88rem", fontWeight:600 }}
                     />
                   </div>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                     <span style={{ fontSize:".84rem", color:"var(--text2)" }}>Geplande bijdrage</span>
-                    <span style={{ fontWeight:600, fontSize:".88rem", color:DIRK.color }}>{fmt(totSpaarOnly + kinderopvangPlan)}</span>
+                    <span style={{ fontWeight:600, fontSize:".88rem", color:"var(--green)" }}>{fmt(totSpaarOnly + kinderopvangPlan)}</span>
                   </div>
                   <div style={{ borderTop:"1px solid var(--border)", paddingTop:".5rem", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                     <span style={{ fontSize:".84rem", color:"var(--text2)" }}>Verwacht eindstand</span>
@@ -1230,7 +1230,7 @@ export default function App() {
                   {monthData.spaarBegin != null && monthData.spaarActueel != null && (
                     <>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                        <span style={{ fontSize:".84rem", color:"var(--text2)" }}>Actueel gespaard</span>
+                        <span style={{ fontSize:".84rem", color:"var(--text2)" }}>Gespaard deze maand</span>
                         <span style={{ fontWeight:600, fontSize:".88rem" }}>{fmt(monthData.spaarActueel)}</span>
                       </div>
                       <div style={{ borderTop:"1px solid var(--border)", paddingTop:".5rem", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
@@ -1242,7 +1242,7 @@ export default function App() {
                           return (
                             <span style={{ fontWeight:700, fontSize:".9rem", color: diff >= 0 ? "var(--green)" : "var(--red)" }}>
                               {fmt(actEind)}{" "}
-                              <span style={{ fontSize:".78rem", fontWeight:400 }}>({diff >= 0 ? "+" : ""}{fmt(diff)})</span>
+                              <span style={{ fontSize:".78rem", fontWeight:400, color: diff >= 0 ? "var(--green)" : "var(--red)" }}>({diff >= 0 ? "+" : ""}{fmt(diff)})</span>
                             </span>
                           );
                         })()}
@@ -1444,7 +1444,7 @@ export default function App() {
               </div>
 
               <Card>
-                <Sec>Spaardoel - {fmt(totSpaar)} / maand</Sec>
+                <Sec>Spaardoel</Sec>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:".4rem" }}>
                   <span style={{ fontSize:".82rem", color:"var(--text2)" }}>Sparen &amp; buffer</span>
                   <span style={{ fontWeight:600, color:DIRK.color, fontSize:".82rem" }}>{fmt(totSpaarOnly + kinderopvangPlan)}</span>
@@ -1457,25 +1457,23 @@ export default function App() {
                   <span style={{ fontSize:".84rem", color:"var(--text2)" }}>Totaal gepland</span>
                   <span style={{ fontWeight:700, color:"var(--text1)" }}>{fmt(totSpaar)}</span>
                 </div>
-                {monthData.spaarBegin != null && (
-                  <>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:".5rem" }}>
-                      <span style={{ fontSize:".82rem", color:"var(--text2)" }}>Beginstand</span>
-                      <span style={{ fontWeight:600, fontSize:".82rem" }}>{fmt(monthData.spaarBegin)}</span>
-                    </div>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:".5rem" }}>
-                      <span style={{ fontSize:".82rem", color:"var(--text2)" }}>Verwacht eindstand</span>
-                      <span style={{ fontWeight:600, fontSize:".82rem" }}>{fmt(monthData.spaarBegin + totSpaarOnly + kinderopvangPlan)}</span>
-                    </div>
-                    {monthData.spaarActueel != null && (
-                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:".5rem" }}>
-                        <span style={{ fontSize:".82rem", color:"var(--text2)" }}>Actueel eindstand</span>
-                        <span style={{ fontWeight:600, fontSize:".82rem", color: (monthData.spaarBegin + monthData.spaarActueel) >= (monthData.spaarBegin + totSpaarOnly + kinderopvangPlan) ? "var(--green)" : "var(--orange)" }}>{fmt(monthData.spaarBegin + monthData.spaarActueel)}</span>
-                      </div>
-                    )}
-                  </>
+                {monthData.spaarBegin != null && monthData.spaarActueel != null && (
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:".5rem" }}>
+                    <span style={{ fontSize:".82rem", color:"var(--text2)" }}>Eindstand spaargeld</span>
+                    {(function(){
+                      var actEind = monthData.spaarBegin + monthData.spaarActueel;
+                      var verwEind = monthData.spaarBegin + totSpaarOnly + kinderopvangPlan;
+                      var diff = actEind - verwEind;
+                      return (
+                        <span style={{ fontWeight:600, fontSize:".82rem", color: diff >= 0 ? "var(--green)" : "var(--red)" }}>
+                          {fmt(actEind)}{" "}
+                          <span style={{ fontSize:".75rem", fontWeight:400 }}>({diff >= 0 ? "+" : ""}{fmt(diff)})</span>
+                        </span>
+                      );
+                    })()}
+                  </div>
                 )}
-                <Bar value={totSpaarActOnly} max={totSpaar > 0 ? totSpaar : 1} color={totSpaarActOnly>=totSpaar?"var(--green)":totSpaarActOnly>=(totSpaar*0.8)?"var(--orange)":"var(--red)"} height={8}/>
+                <Bar value={totSpaarAct} max={totSpaar > 0 ? totSpaar : 1} color={totSpaarAct>=totSpaar?"var(--green)":totSpaarAct>=(totSpaar*0.8)?"var(--orange)":"var(--red)"} height={8}/>
                 <div style={{ display:"flex", gap:"1.5rem", marginTop:".6rem", fontSize:".78rem", color:"var(--text2)" }}>
                   <span>Dirk: <strong style={{ color:DIRK.color }}>{fmt(allocD)}</strong></span>
                   <span>Shelley: <strong style={{ color:SHELLEY.color }}>{fmt(allocS)}</strong></span>
