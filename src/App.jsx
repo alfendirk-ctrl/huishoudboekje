@@ -1599,14 +1599,34 @@ export default function App() {
                           </div>
                         );
                       })}
+                      {(function() {
+                        var includedRows = importRows.filter(function(r){ return r.include !== false; });
+                        var totalIn   = includedRows.reduce(function(s,r){ return s+r.amount; }, 0);
+                        var totalCat  = includedRows.filter(function(r){ return r.assignedId !== "__onbekend__"; }).reduce(function(s,r){ return s+r.amount; }, 0);
+                        var totalUnkn = includedRows.filter(function(r){ return r.assignedId === "__onbekend__"; }).reduce(function(s,r){ return s+r.amount; }, 0);
+                        return (
+                          <div style={{ display:"grid", gridTemplateColumns:"1fr 80px 90px", padding:".6rem .85rem", background:"var(--surface2)", fontSize:".78rem", borderTop:"2px solid var(--border)" }}>
+                            <span style={{ color:"var(--text2)" }}>Totaal</span>
+                            <span style={{ textAlign:"right", color:"var(--text2)" }}>{fmt(totalCat)}</span>
+                            <span style={{ textAlign:"right", fontWeight:700 }}>{fmt(totalIn)}</span>
+                            {totalUnkn > 0 && <>
+                              <span style={{ color:"#92400e", marginTop:2 }}>Niet ingedeeld</span>
+                              <span/>
+                              <span style={{ textAlign:"right", color:"#92400e", fontWeight:600 }}>-{fmt(totalUnkn)}</span>
+                            </>}
+                          </div>
+                        );
+                      })()}
                     </div>
                     {(function() {
                       var unknown = importRows.filter(function(r){ return r.include !== false && r.assignedId === "__onbekend__"; });
                       if (!unknown.length) return null;
+                      var unknownTotal = unknown.reduce(function(s,r){ return s+r.amount; }, 0);
                       return (
                         <div style={{ marginBottom:".85rem", border:"1px solid #fde68a", borderRadius:"var(--radius-sm)", background:"#fffbeb" }}>
-                          <div style={{ padding:".5rem .85rem", borderBottom:"1px solid #fde68a", fontSize:".78rem", fontWeight:600, color:"#92400e" }}>
-                            {unknown.length} transactie{unknown.length > 1 ? "s" : ""} niet herkend — wijs ze handmatig toe
+                          <div style={{ padding:".5rem .85rem", borderBottom:"1px solid #fde68a", fontSize:".78rem", fontWeight:600, color:"#92400e", display:"flex", justifyContent:"space-between" }}>
+                            <span>{unknown.length} transactie{unknown.length > 1 ? "s" : ""} niet ingedeeld</span>
+                            <span>{fmt(unknownTotal)}</span>
                           </div>
                           {unknown.map(function(r) {
                             var globalIdx = importRows.findIndex(function(x){ return x.id===r.id; });
